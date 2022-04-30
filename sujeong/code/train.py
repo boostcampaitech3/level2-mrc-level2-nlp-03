@@ -1,9 +1,10 @@
 import logging
 import os
 import sys
+import wandb
 from typing import NoReturn
 
-from arguments import DataTrainingArguments, ModelArguments
+from arguments import SettingArguments, DataTrainingArguments, ModelArguments
 from datasets import DatasetDict, load_from_disk, load_metric
 from trainer_qa import QuestionAnsweringTrainer
 from transformers import (
@@ -26,9 +27,10 @@ def main():
     # --help flag 를 실행시켜서 확인할 수 도 있습니다.
 
     parser = HfArgumentParser(
-        (ModelArguments, DataTrainingArguments, TrainingArguments)
+        (SettingArguments, ModelArguments, DataTrainingArguments, TrainingArguments)
     )
-    model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+    setting_args, model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+    print(setting_args)
     print(model_args.model_name_or_path)
 
     # [참고] argument를 manual하게 수정하고 싶은 경우에 아래와 같은 방식을 사용할 수 있습니다
@@ -37,6 +39,28 @@ def main():
 
     print(f"model is from {model_args.model_name_or_path}")
     print(f"data is from {data_args.dataset_name}")
+
+    # wandb 설절
+    if setting_args.use_wandb:
+        exp_full_name = f'{model_args.model_name_or_path}_{data_args.dataset_name}_{training_args.learning_rate}'#_{training_args.optim}'
+        wandb.login()
+        # project : 우리 그룹내에서 본인이 만든 프로젝트 이름
+        # name : 저장되는 실험 이름
+        # entity : 우리 그룹/팀 이름
+
+        wandb.init( project='sujeongim',
+                    name=exp_full_name,
+                    entity='mrc-competition')  # nlp-03
+        wandb.config.update(training_args)
+        print('#######################')
+        print(f'Experiments name: {exp_full_name}')
+        print('#######################')
+    else:
+        exp_full_name = ''
+        print('@@@@@@@@Notice@@@@@@@@@@')
+        print('YOU ARE NOT LOGGING RESULTS NOW')
+        print('@@@@@@@@$$$$$$@@@@@@@@@@')
+
 
     # logging 설정
     logging.basicConfig(

@@ -1,6 +1,33 @@
 from dataclasses import dataclass, field
 from typing import Optional
 
+@dataclass
+class SettingArguments:
+    """
+    Arguments pertaining to basic setting(basic_env, wandb)
+    """
+
+    device: str = field(
+        default='cuda:0',
+        metadata={
+            "help": "device id"
+        },
+    )
+
+    # for wandb
+    use_wandb: bool = field(
+        default=False,
+        metadata={
+            "help": "if you're ready to log in wandb"
+        },
+    )
+
+    user_name: str = field(
+        default="sujeongim",
+        metadata={
+            "help": "your initial name"
+        },
+    )
 
 @dataclass
 class ModelArguments:
@@ -90,3 +117,7 @@ class DataTrainingArguments:
     use_faiss: bool = field(
         default=False, metadata={"help": "Whether to build with faiss"}
     )
+
+
+
+
