@@ -18,6 +18,14 @@ from transformers import (
 )
 from utils_qa import check_no_error, postprocess_qa_predictions
 
+from ray import tune
+from ray.tune import CLIReporter
+from ray.tune.schedulers import ASHAScheduler
+from ray.tune.schedulers import PopulationBasedTraining
+
+import os
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
 logger = logging.getLogger(__name__)
 
 
@@ -70,11 +78,17 @@ def main():
         # rust version이 비교적 속도가 빠릅니다.
         use_fast=True,
     )
+    # def model_init():
+    #     return AutoModelForQuestionAnswering.from_pretrained(
+    #         model_args.model_name_or_path,
+    #         from_tf=bool(".ckpt" in model_args.model_name_or_path),
+    #         config=config,
+    #     )
     model = AutoModelForQuestionAnswering.from_pretrained(
-        model_args.model_name_or_path,
-        from_tf=bool(".ckpt" in model_args.model_name_or_path),
-        config=config,
-    )
+            model_args.model_name_or_path,
+            from_tf=bool(".ckpt" in model_args.model_name_or_path),
+            config=config,
+        )
 
     print(
         type(training_args),
@@ -95,7 +109,7 @@ def run_mrc(
     model_args: ModelArguments,
     datasets: DatasetDict,
     tokenizer,
-    model,
+    model
 ) -> NoReturn:
 
     # dataset을 전처리합니다.
@@ -130,7 +144,7 @@ def run_mrc(
             stride=data_args.doc_stride,
             return_overflowing_tokens=True,
             return_offsets_mapping=True,
-            # return_token_type_ids=False, # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
+            return_token_type_ids=False, # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
             padding="max_length" if data_args.pad_to_max_length else False,
         )
 
@@ -222,7 +236,7 @@ def run_mrc(
             stride=data_args.doc_stride,
             return_overflowing_tokens=True,
             return_offsets_mapping=True,
-            # return_token_type_ids=False, # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
+            return_token_type_ids=False, # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
             padding="max_length" if data_args.pad_to_max_length else False,
         )
 
@@ -300,16 +314,56 @@ def run_mrc(
         return metric.compute(predictions=p.predictions, references=p.label_ids)
 
     # Trainer 초기화
+
+    # Raytune 설정
+
+    config = AutoConfig.from_pretrained(
+        model_args.config_name
+        if model_args.config_name is not None
+        else model_args.model_name_or_path,
+    )
+
+    def model_init():
+        return AutoModelForQuestionAnswering.from_pretrained(
+            model_args.model_name_or_path,
+            from_tf=bool(".ckpt" in model_args.model_name_or_path),
+            config=config
+        )
+
+    
+    model = model_init()
+
+    training_args.skip_memory_metrics=True
     trainer = QuestionAnsweringTrainer(
-        model=model,
+        model_init = model_init,
         args=training_args,
-        train_dataset=train_dataset if training_args.do_train else None,
-        eval_dataset=eval_dataset if training_args.do_eval else None,
+        # train_dataset=train_dataset if training_args.do_train else None,
+        train_dataset=datasets["train"] if training_args.do_train else None,
+        # eval_dataset=eval_dataset if training_args.do_eval else None,
+        eval_dataset=datasets["validation"] if training_args.do_eval else None,
         eval_examples=datasets["validation"] if training_args.do_eval else None,
         tokenizer=tokenizer,
         data_collator=data_collator,
         post_process_function=post_processing_function,
-        compute_metrics=compute_metrics,
+        compute_metrics=compute_metrics
+    )
+
+
+    tune_config = {
+    "lr": tune.uniform(1e-5, 5e-5),
+    "weight_decay": tune.choice([0.1, 0.2, 0.3])
+    }   
+
+
+    #finally
+    trainer.hyperparameter_search(
+        direction="maximize",
+        hp_space=lambda _: tune_config,
+        backend="ray",
+        resources_per_trial={"cpu": 0.05, "gpu": 0.05},
+        n_trials=1,
+        keep_checkpoints_num=1
+        # scheduler=ASHAScheduler(metric="objective", mode="max")
     )
 
     # Training
