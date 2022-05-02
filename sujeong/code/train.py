@@ -2,6 +2,7 @@ import logging
 import os
 import sys
 import wandb
+from pprint import pprint
 from typing import NoReturn
 
 from arguments import SettingArguments, DataTrainingArguments, ModelArguments
@@ -18,6 +19,8 @@ from transformers import (
     set_seed,
 )
 from utils_qa import check_no_error, postprocess_qa_predictions
+import timeit
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -37,12 +40,24 @@ def main():
     # training_args.per_device_train_batch_size = 4
     # print(training_args.per_device_train_batch_size)
 
+    dataset_full_path = os.path.join(data_args.dataset_path, data_args.dataset_name)
+
     print(f"model is from {model_args.model_name_or_path}")
-    print(f"data is from {data_args.dataset_name}")
+    print(f"data is from {dataset_full_path}")
+
+    # 기존 학습 기록 삭제
+    if os.path.exists('./models'):
+        os.rmdir(dir_path)
+    if os.path.exists('./wandb'):
+        os.rmdir(dir_path)
+    
 
     # wandb 설절
     if setting_args.use_wandb:
-        exp_full_name = f'{model_args.model_name_or_path}_{data_args.dataset_name}_{training_args.learning_rate}'#_{training_args.optim}'
+        if setting_args.exp_name:
+            exp_full_name = f'{setting_args.exp_name}_{model_args.model_name_or_path}_{dataset_full_path}_{training_args.learning_rate}'#_{training_args.optim}'
+        else:
+            exp_full_name = f'{model_args.model_name_or_path}_{dataset_full_path}_{training_args.learning_rate}'#_{training_args.optim}'
         wandb.login()
         # project : 우리 그룹내에서 본인이 만든 프로젝트 이름
         # name : 저장되는 실험 이름
@@ -75,7 +90,7 @@ def main():
     # 모델을 초기화하기 전에 난수를 고정합니다.
     set_seed(training_args.seed)
 
-    datasets = load_from_disk(data_args.dataset_name)
+    datasets = load_from_disk(dataset_full_path)
     print(datasets)
 
     # AutoConfig를 이용하여 pretrained model 과 tokenizer를 불러옵니다.
@@ -122,6 +137,8 @@ def run_mrc(
     model,
 ) -> NoReturn:
 
+    start_time = timeit.default_timer() # 시작 시간 체크
+
     # dataset을 전처리합니다.
     # training과 evaluation에서 사용되는 전처리는 아주 조금 다른 형태를 가집니다.
     if training_args.do_train:
@@ -136,6 +153,7 @@ def run_mrc(
     # Padding에 대한 옵션을 설정합니다.
     # (question|context) 혹은 (context|question)로 세팅 가능합니다.
     pad_on_right = tokenizer.padding_side == "right"
+    #pad_on_right = tokenizer.padding_side == "left"
 
     # 오류가 있는지 확인합니다.
     last_checkpoint, max_seq_length = check_no_error(
@@ -159,7 +177,7 @@ def run_mrc(
         )
 
         # (question|context) 혹은 (context|question) 순서 확인용 
-        print(tokenizer.decode(tokenized_examples['input_ids'][0]))
+        pprint(tokenizer.decode(tokenized_examples['input_ids'][0]))
 
         # 길이가 긴 context가 등장할 경우 truncate를 진행해야하므로, 해당 데이터셋을 찾을 수 있도록 mapping 가능한 값이 필요합니다.
         sample_mapping = tokenized_examples.pop("overflow_to_sample_mapping")
@@ -379,7 +397,10 @@ def run_mrc(
 
         trainer.log_metrics("eval", metrics)
         trainer.save_metrics("eval", metrics)
-
+    
+    terminate_time = timeit.default_timer() # 종료 시간 체크  
+ 
+    print(f"{(terminate_time - start_time)//60}분 {(terminate_time - start_time)%60:.3f}초 걸렸습니다.")
 
 if __name__ == "__main__":
     main()

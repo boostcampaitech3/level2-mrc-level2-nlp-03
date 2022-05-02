@@ -7,6 +7,7 @@ Open-Domain Question Answering 을 수행하는 inference 코드 입니다.
 
 import logging
 import sys
+from pprint import pprint
 from typing import Callable, Dict, List, NoReturn, Tuple
 
 import numpy as np
@@ -33,6 +34,8 @@ from transformers import (
     set_seed,
 )
 from utils_qa import check_no_error, postprocess_qa_predictions
+import timeit
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -48,8 +51,14 @@ def main():
 
     training_args.do_train = True
 
+    dataset_full_path = os.path.join(data_args.dataset_path, data_args.dataset_name)
+
     print(f"model is from {model_args.model_name_or_path}")
-    print(f"data is from {data_args.dataset_name}")
+    print(f"data is from {dataset_full_path}")
+
+    # 이전 outputs 삭제
+    if os.path.exists('./outputs'):
+        os.rmdir(dir_path)
 
     # logging 설정
     logging.basicConfig(
@@ -64,7 +73,7 @@ def main():
     # 모델을 초기화하기 전에 난수를 고정합니다.
     set_seed(training_args.seed)
 
-    datasets = load_from_disk(data_args.dataset_name)
+    datasets = load_from_disk(dataset_full_path)
     print(datasets)
 
     # AutoConfig를 이용하여 pretrained model 과 tokenizer를 불러옵니다.
@@ -89,7 +98,7 @@ def main():
     # True일 경우 : run passage retrieval
     if data_args.eval_retrieval:
         datasets = run_sparse_retrieval(
-            tokenizer.tokenize, datasets, training_args, data_args,
+            tokenizer.tokenize, datasets, training_args, data_args, data_args.dataset_path
         )
 
     # eval or predict mrc model
@@ -160,6 +169,8 @@ def run_mrc(
     model,
 ) -> NoReturn:
 
+    start_time = timeit.default_timer() # 시작 시간 체크
+
     # eval 혹은 prediction에서만 사용함
     column_names = datasets["validation"].column_names
 
@@ -170,6 +181,7 @@ def run_mrc(
     # Padding에 대한 옵션을 설정합니다.
     # (question|context) 혹은 (context|question)로 세팅 가능합니다.
     pad_on_right = tokenizer.padding_side == "right"
+    # pad_on_right = tokenizer.padding_side == "left"
 
     # 오류가 있는지 확인합니다.
     last_checkpoint, max_seq_length = check_no_error(
@@ -191,6 +203,9 @@ def run_mrc(
             # return_token_type_ids=False, # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
             padding="max_length" if data_args.pad_to_max_length else False,
         )
+
+        # (question|context) 혹은 (context|question) 순서 확인용 
+        print(tokenizer.decode(tokenized_examples['input_ids'][0]))
 
         # 길이가 긴 context가 등장할 경우 truncate를 진행해야하므로, 해당 데이터셋을 찾을 수 있도록 mapping 가능한 값이 필요합니다.
         sample_mapping = tokenized_examples.pop("overflow_to_sample_mapping")
@@ -304,6 +319,9 @@ def run_mrc(
         trainer.log_metrics("test", metrics)
         trainer.save_metrics("test", metrics)
 
+    terminate_time = timeit.default_timer() # 종료 시간 체크  
+ 
+    print(f"{(terminate_time - start_time)//60}분 {(terminate_time - start_time)%60:.3f}초 걸렸습니다.")
 
 if __name__ == "__main__":
     main()

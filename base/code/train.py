@@ -1,9 +1,11 @@
 import logging
 import os
 import sys
+import wandb
+from pprint import pprint
 from typing import NoReturn
 
-from arguments import DataTrainingArguments, ModelArguments
+from arguments import SettingArguments, DataTrainingArguments, ModelArguments
 from datasets import DatasetDict, load_from_disk, load_metric
 from trainer_qa import QuestionAnsweringTrainer
 from transformers import (
@@ -17,6 +19,8 @@ from transformers import (
     set_seed,
 )
 from utils_qa import check_no_error, postprocess_qa_predictions
+import timeit
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -26,17 +30,52 @@ def main():
     # --help flag 를 실행시켜서 확인할 수 도 있습니다.
 
     parser = HfArgumentParser(
-        (ModelArguments, DataTrainingArguments, TrainingArguments)
+        (SettingArguments, ModelArguments, DataTrainingArguments, TrainingArguments)
     )
-    model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+    setting_args, model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+    print(setting_args)
     print(model_args.model_name_or_path)
 
     # [참고] argument를 manual하게 수정하고 싶은 경우에 아래와 같은 방식을 사용할 수 있습니다
     # training_args.per_device_train_batch_size = 4
     # print(training_args.per_device_train_batch_size)
 
+    dataset_full_path = os.path.join(data_args.dataset_path, data_args.dataset_name)
+
     print(f"model is from {model_args.model_name_or_path}")
-    print(f"data is from {data_args.dataset_name}")
+    print(f"data is from {dataset_full_path}")
+
+    # 기존 학습 기록 삭제
+    if os.path.exists('./models'):
+        os.rmdir(dir_path)
+    if os.path.exists('./wandb'):
+        os.rmdir(dir_path)
+    
+
+    # wandb 설절
+    if setting_args.use_wandb:
+        if setting_args.exp_name:
+            exp_full_name = f'{setting_args.exp_name}_{model_args.model_name_or_path}_{dataset_full_path}_{training_args.learning_rate}'#_{training_args.optim}'
+        else:
+            exp_full_name = f'{model_args.model_name_or_path}_{dataset_full_path}_{training_args.learning_rate}'#_{training_args.optim}'
+        wandb.login()
+        # project : 우리 그룹내에서 본인이 만든 프로젝트 이름
+        # name : 저장되는 실험 이름
+        # entity : 우리 그룹/팀 이름
+
+        wandb.init( project='sujeongim',
+                    name=exp_full_name,
+                    entity='mrc-competition')  # nlp-03
+        wandb.config.update(training_args)
+        print('#######################')
+        print(f'Experiments name: {exp_full_name}')
+        print('#######################')
+    else:
+        exp_full_name = ''
+        print('@@@@@@@@Notice@@@@@@@@@@')
+        print('YOU ARE NOT LOGGING RESULTS NOW')
+        print('@@@@@@@@$$$$$$@@@@@@@@@@')
+
 
     # logging 설정
     logging.basicConfig(
@@ -51,7 +90,7 @@ def main():
     # 모델을 초기화하기 전에 난수를 고정합니다.
     set_seed(training_args.seed)
 
-    datasets = load_from_disk(data_args.dataset_name)
+    datasets = load_from_disk(dataset_full_path)
     print(datasets)
 
     # AutoConfig를 이용하여 pretrained model 과 tokenizer를 불러옵니다.
@@ -97,6 +136,8 @@ def run_mrc(
     tokenizer,
     model,
 ) -> NoReturn:
+
+    start_time = timeit.default_timer() # 시작 시간 체크
 
     # dataset을 전처리합니다.
     # training과 evaluation에서 사용되는 전처리는 아주 조금 다른 형태를 가집니다.
@@ -352,7 +393,10 @@ def run_mrc(
 
         trainer.log_metrics("eval", metrics)
         trainer.save_metrics("eval", metrics)
-
+    
+    terminate_time = timeit.default_timer() # 종료 시간 체크  
+ 
+    print(f"{(terminate_time - start_time)//60}분 {(terminate_time - start_time)%60:.3f}초 걸렸습니다.")
 
 if __name__ == "__main__":
     main()

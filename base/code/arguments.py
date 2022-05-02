@@ -1,6 +1,33 @@
 from dataclasses import dataclass, field
 from typing import Optional
 
+@dataclass
+class SettingArguments:
+    """
+    Arguments pertaining to basic setting(basic_env, wandb)
+    """
+
+    device: str = field(
+        default='cuda:0',
+        metadata={
+            "help": "device id"
+        },
+    )
+
+    # for wandb
+    use_wandb: bool = field(
+        default=False,
+        metadata={
+            "help": "if you're ready to log in wandb"
+        },
+    )
+
+    exp_name: Optional[str] = field(
+        default=None,
+        metadata={
+            "help": "your experiment name"
+        },
+    )
 
 @dataclass
 class ModelArguments:
@@ -33,9 +60,13 @@ class DataTrainingArguments:
     """
     Arguments pertaining to what data we are going to input our model for training and eval.
     """
+    dataset_path: Optional[str] = field(
+        default="/opt/ml/input/data",
+        metadata={"help": "The name of the dataset to use."},
+    )
 
     dataset_name: Optional[str] = field(
-        default="../data/train_dataset",
+        default="train_dataset",
         metadata={"help": "The name of the dataset to use."},
     )
     overwrite_cache: bool = field(
@@ -90,3 +121,7 @@ class DataTrainingArguments:
     use_faiss: bool = field(
         default=False, metadata={"help": "Whether to build with faiss"}
     )
+
+
+
+
