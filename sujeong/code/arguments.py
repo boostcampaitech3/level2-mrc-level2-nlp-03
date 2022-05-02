@@ -22,10 +22,10 @@ class SettingArguments:
         },
     )
 
-    user_name: str = field(
-        default="sujeongim",
+    exp_name: Optional[str] = field(
+        default=None,
         metadata={
-            "help": "your initial name"
+            "help": "your experiment name"
         },
     )
 
@@ -60,9 +60,13 @@ class DataTrainingArguments:
     """
     Arguments pertaining to what data we are going to input our model for training and eval.
     """
+    dataset_path: Optional[str] = field(
+        default="/opt/ml/input/data",
+        metadata={"help": "The name of the dataset to use."},
+    )
 
     dataset_name: Optional[str] = field(
-        default="../data/train_dataset",
+        default="train_dataset",
         metadata={"help": "The name of the dataset to use."},
     )
     overwrite_cache: bool = field(
