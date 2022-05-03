@@ -47,9 +47,9 @@ def main():
 
     # 기존 학습 기록 삭제
     if os.path.exists('./models'):
-        os.rmdir(dir_path)
+        os.rmdir('./models')
     if os.path.exists('./wandb'):
-        os.rmdir(dir_path)
+        os.rmdir('./wandb')
     
 
     # wandb 설절
