@@ -60,11 +60,6 @@ class DataTrainingArguments:
     """
     Arguments pertaining to what data we are going to input our model for training and eval.
     """
-    hp_dataset_path: Optional[str] = field(
-        default="/opt/ml/input/data/train_dataset",
-        metadata={"help": "The name of the dataset to use."},
-    )
-
     dataset_path: Optional[str] = field(
         default="/opt/ml/input/data",
         metadata={"help": "The name of the dataset to use."},
@@ -127,6 +122,28 @@ class DataTrainingArguments:
         default=False, metadata={"help": "Whether to build with faiss"}
     )
 
-
-
+    ### READER added
+    # eval_steps: int = field(
+    #     default=400,
+    #     metadata={
+    #         "help": "evaluation step"
+    #     },
+    # )
+    # dataset_path: Optional[str] = field(
+    #     default="steps",
+    #     metadata={"help": "epochs? steps?"},
+    # )
+    #
+    # logging_steps: int = field(
+    #     default=400,
+    #     metadata={
+    #         "help": "training logging step"
+    #     },
+    # )
+    # save_steps: int = field(
+    #     default=400,
+    #     metadata={
+    #         "help": "saving step"
+    #     },
+    # )
 
