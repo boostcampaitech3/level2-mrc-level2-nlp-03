@@ -119,6 +119,11 @@ class QuestionAnsweringTrainer2(QuestionAnsweringTrainer):
         super().__init__(*args, **kwargs)
         self.eval_examples = eval_examples
         self.post_process_function = post_process_function
+        self.self_eval_cnt = 1
+        # self.control.should_evaluate 업데이트가 되면서 eval_steps에 따라 돼야하는데 동작이 이상함. -> 내부에서 따로 eval_steps에 따라 동작하도록함
+        self.self_train_log_cnt = kwargs['args'].logging_steps
+        self.max_eval_cnt = kwargs['args'].eval_steps
+        self.self_eval_check_mode = True if kwargs['args'].evaluation_strategy =='steps' else False
 
 
     # def set_new_callbackhandler(self):
@@ -126,8 +131,50 @@ class QuestionAnsweringTrainer2(QuestionAnsweringTrainer):
     #         callbacks, self.model, self.tokenizer, self.optimizer, self.lr_scheduler
     #     )
 
-    def log(self, logs, eval_gt, eval_pred):
+    def _maybe_log_save_evaluate(self, tr_loss, model, trial, epoch, ignore_keys_for_eval):
+        if self.control.should_log:
+            # if is_torch_tpu_available():
+            #     xm.mark_step()
+
+            logs = {}
+
+            # all_gather + mean() to get average loss over all processes
+            tr_loss_scalar = self._nested_gather(tr_loss).mean().item()
+
+            # reset tr_loss to zero
+            tr_loss -= tr_loss
+
+            logs["loss"] = round(tr_loss_scalar / (self.state.global_step - self._globalstep_last_logged), 4)
+            logs["learning_rate"] = self._get_learning_rate()
+
+            self._total_loss_scalar += tr_loss_scalar
+            self._globalstep_last_logged = self.state.global_step
+            self.store_flos()
+
+            self.do_log_topk = False
+            self.log(logs,write_mode='train')
+            self.self_eval_cnt+= self.self_train_log_cnt #(self.self_train_log_cnt//self.max_eval_cnt)
+
+        metrics = None
+
+        # 밑에 self.control_should_evaluate 이 eval_steps에 따라 작동이 안돼서..
+        # breakpoint()
+        if self.self_eval_check_mode and self.max_eval_cnt <= self.self_eval_cnt:
+            metrics = self.evaluate(ignore_keys=ignore_keys_for_eval)
+            self.self_eval_cnt = 1
+
+        if self.control.should_evaluate:
+            metrics = self.evaluate(ignore_keys=ignore_keys_for_eval)
+            self._report_to_hp_search(trial, epoch, metrics)
+
+        if self.control.should_save:
+            self._save_checkpoint(model, trial, metrics=metrics)
+            self.control = self.callback_handler.on_save(self.args, self.state, self.control)
+
+
+    def log(self, logs, eval_gt=None, eval_pred=None, write_mode='eval'):
         # wandb에 저장하는 값들을 위해서 overiding
+        # 이 부분은 evaluation에서
         if self.state.epoch is not None:
             logs["epoch"] = round(self.state.epoch, 2)
 
@@ -135,13 +182,23 @@ class QuestionAnsweringTrainer2(QuestionAnsweringTrainer):
         self.state.log_history.append(output)
         # 매번 reset인지는 확인 필요함
         # # https://github.com/huggingface/transformers/blob/daecae1f1ce02d2dab23742d24f7a66a7d20cb79/src/transformers/trainer_callback.py#L284
+        # breakpoint()
+        if write_mode == 'eval':
+            # train 이면 _maybe_log_save_evaluate의 self.log 에서 input, prediction을 굳이 넘기진 않기 때문(넘겨오게 할 수도 있지만 굳이?)
+            self.state.log_history.append({'eval_gt': eval_gt})
+            self.state.log_history.append({'eval_pred': eval_pred})
+        else:
+            self.state.log_history.append({'eval_gt': None})
+            self.state.log_history.append({'eval_pred': None})
 
-        self.state.log_history.append({'eval_gt': eval_gt})
-        self.state.log_history.append({'eval_pred': eval_pred})
         if self.do_log_topk:
             self.state.log_history.append({'topk_info': [self.topk_pr_columns, self.topk_pr]})
         else:
             self.state.log_history.append({'topk_info':None})
+
+        self.state.log_history.append({'write_mode': write_mode})
+
+        # callback_hanlder.on_log가 돌아가면 trainer_callback.py에서 train/logs 값으로 on_log를 호출하는 것 같다..!
         self.control = self.callback_handler.on_log(self.args, self.state, self.control, logs)
 
     def evaluate(self, eval_dataset=None, eval_examples=None, ignore_keys=None, df= None):
@@ -168,6 +225,7 @@ class QuestionAnsweringTrainer2(QuestionAnsweringTrainer):
         compute_metrics = self.compute_metrics
         self.compute_metrics = None
         try:
+            breakpoint()
             output = self.prediction_loop(
                 eval_dataloader,
                 description="Evaluation",
@@ -176,6 +234,7 @@ class QuestionAnsweringTrainer2(QuestionAnsweringTrainer):
                 prediction_loss_only=True if compute_metrics is None else None,
                 ignore_keys=ignore_keys,
             )
+            breakpoint()
         finally:
             self.compute_metrics = compute_metrics
 
@@ -191,7 +250,9 @@ class QuestionAnsweringTrainer2(QuestionAnsweringTrainer):
             )
             # breakpoint()
             metrics = self.compute_metrics(eval_preds)
+            # 여기 추가
             self.log(metrics, eval_examples, eval_preds)
+
         else:
             metrics = {}
 

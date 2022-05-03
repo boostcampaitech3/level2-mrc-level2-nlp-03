@@ -30,10 +30,9 @@ def make_dirs(path):
 
 
 class customWandbCallback(WandbCallback):
-    def __init__(self, write_mode='train', auto_save=True, save_path= './test_json_results'):
+    def __init__(self, auto_save=True, save_path= './test_json_results'):
         " Training, Eval 때 confusion matrix는 Figure class라서 예외처리 추가"
         super(customWandbCallback, self).__init__()
-        self.write_mode = write_mode
         self.auto_save = auto_save
         self.save_path = save_path
         self.make_dirs(self.save_path)
@@ -44,7 +43,11 @@ class customWandbCallback(WandbCallback):
     def on_log(self, args, state, control, model=None, logs=None, **kwargs):
         if self._wandb is None:
             return
-        
+
+        if state.log_history[-1]['write_mode'] =='train':
+            write_mode = 'train'
+        else:
+            write_mode = 'eval'
         # https://github.com/huggingface/transformers/blob/v4.18.0/src/transformers/integrations.py#L535
         if not self._initialized:
             self.setup(args, state, model)
@@ -52,7 +55,7 @@ class customWandbCallback(WandbCallback):
         if state.is_world_process_zero:
 
             # 모드에 따라 이름을 변경해주는 함수
-            logs = rewrite_logs(self.write_mode, logs)
+            logs = rewrite_logs(write_mode, logs)
 
             for metric, vals in logs.items():
                 if isinstance(vals, float) or isinstance(vals, int):
@@ -64,36 +67,44 @@ class customWandbCallback(WandbCallback):
             # Trainer에서 저장할 때 append로 했기 때문에 [1], [2]와 같은 indexing 필요. (안전하게 하려고..)
 
             # retrieval
-            # if 'ret_eval_only' in self.write_mode:
-            #     breakpoint()
-            #     pass
+            if write_mode =='eval':
+                # train 때의 log랑 쌓여있음 -> 뒤에서 3번째꺼
+                eval_gt = state.log_history[-4]['eval_gt']
+                eval_pred = state.log_history[-3]['eval_pred']
+                columns = ['gt_id','gt_title', 'gt_doc_id','gt_context', 'gt_len','gt_start_idx', 'question','gt_answer', 'prediction']
+                data = []
+                # https://docs.wandb.ai/guides/track/log/media
 
-            eval_gt = state.log_history[1]['eval_gt']
-            eval_pred = state.log_history[2]['eval_pred']
-            columns = ['gt_id','gt_title', 'gt_doc_id','gt_context', 'gt_start_idx', 'gt_text', 'prediction_text']
-            data = []
-            # https://docs.wandb.ai/guides/track/log/media
-            breakpoint()
-            for idx in range(len(eval_pred[0])):
-                cur_gt_data = eval_gt[idx]
-                pred_data = eval_pred[0][idx] # 답이 1개인 것만 있다해서 answer는 1개만 받습니당
-                new_data = [cur_gt_data['id'], cur_gt_data['context'], cur_gt_data['title'], cur_gt_data['answers']['answer_start'],
-                            cur_gt_data['answers']['text'][0] ,cur_gt_data['document_id'], pred_data['prediction_text']]
-                data.append(new_data)
-            test_table = wandb.Table(data = data, columns=columns)
+                # 마지막 eval일 때는 eval_pred[0]가 없는 것 같당!
+                # need to fix @TODO
+                if eval_gt is not None:
+                    for idx in range(len(eval_pred[0])):
+                        cur_gt_data = eval_gt[idx]
 
-            if self.auto_save:
-                cur_date = datetime.now()
-                df = pd.DataFrame(data, columns = columns)
-                df.to_csv(os.path.join(self.save_path, f'{cur_date.strftime("%d-%b-%Y (%H:%M:%S.%f)")}-results.json'))
+                        pred_data = eval_pred[0][idx] # 답이 1개인 것만 있다해서 answer는 1개만 받습니당
+                        new_data = [cur_gt_data['id'], cur_gt_data['title'], cur_gt_data['document_id'],
+                                    cur_gt_data['context'], len(cur_gt_data['context']),
+                                    cur_gt_data['answers']['answer_start'], cur_gt_data['question'],
+                                    cur_gt_data['answers']['text'][0] ,pred_data['prediction_text']]
+                        data.append(new_data)
+                    test_table = wandb.Table(data = data, columns=columns)
 
-            self._wandb.log({'test_results': test_table})
-            # test_artifacts.add(test_table, 'test table')
-            # self._wandb.run.log_artifact(test_artifacts)
+                    if self.auto_save:
+                        cur_date = datetime.now()
+                        df = pd.DataFrame(data, columns = columns)
+                        df.to_csv(os.path.join(self.save_path, f'{cur_date.strftime("%d-%b-%Y (%H:%M:%S.%f)")}-results.json'))
 
-            if state.log_history[3]['topk_info'] is not None:
-                topk_table = wandb.Table(data=state.log_history[3]['topk_info'][1], columns = state.log_history[3]['topk_info'][0])
-                self._wandb.log({'topk_results': topk_table})
+                    self._wandb.log({'test_results': test_table})
+                    # test_artifacts.add(test_table, 'test table')
+                    # self._wandb.run.log_artifact(test_artifacts)
+                    # durleh 마찬가지로 누적돼서..
+                    if state.log_history[-2]['topk_info'] is not None:
+                        topk_table = wandb.Table(data=state.log_history[3]['topk_info'][1], columns = state.log_history[3]['topk_info'][0])
+                        self._wandb.log({'topk_results': topk_table})
+                    # 저장해주기 위해서 dataset type으로 저장된 eval_gt, eval_pred 제거
+                    # breakpoint()
+                    state.log_history.pop(-3)
+                    state.log_history.pop(-3)
             """ 예제
             
             (Pdb) eval_pred[1][0]

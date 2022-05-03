@@ -36,6 +36,10 @@ def main():
     setting_args, model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     print(setting_args)
     print(model_args.model_name_or_path)
+    training_args.eval_steps= 500
+    training_args.evaluation_strategy = 'steps'
+    training_args.logging_steps = 500
+    training_args.save_steps = 500
 
     # [참고] argument를 manual하게 수정하고 싶은 경우에 아래와 같은 방식을 사용할 수 있습니다
     # training_args.per_device_train_batch_size = 4
@@ -344,6 +348,7 @@ def run_mrc(
         return metric.compute(predictions=p.predictions, references=p.label_ids)
 
     # Trainer 초기화
+
     trainer = QuestionAnsweringTrainer2(
         model=model,
         args=training_args,
@@ -354,7 +359,8 @@ def run_mrc(
         data_collator=data_collator,
         post_process_function=post_processing_function,
         compute_metrics=compute_metrics,
-        callbacks=[customWandbCallback]
+        callbacks=[customWandbCallback],
+
     )
 
     # Training
