@@ -128,6 +128,8 @@ class QuestionAnsweringBaseTrainer(QuestionAnsweringTrainer):
         self.self_train_log_cnt = kwargs['args'].logging_steps
         self.max_eval_cnt = kwargs['args'].eval_steps
         self.self_eval_check_mode = True if kwargs['args'].evaluation_strategy =='steps' else False
+        # self.callback_handler.callbacks.pop(2) # 아래와 같은 상황에서 WandbCallback 제거
+        # [<transformers.trainer_callback.DefaultFlowCallback object at 0x7f333f3a3370>, <transformers.integrations.TensorBoardCallback object at 0x7f333f3a33d0>, <transformers.integrations.WandbCallback object at 0x7f333f3a35b0>, <custom.base_callback.customBaseWandbCallback object at 0x7f333f3a3490>, <transformers.trainer_callback.ProgressCallback object at 0x7f333f3a3430>]
 
     def _maybe_log_save_evaluate(self, tr_loss, model, trial, epoch, ignore_keys_for_eval):
         if self.control.should_log:
@@ -150,7 +152,7 @@ class QuestionAnsweringBaseTrainer(QuestionAnsweringTrainer):
             self.store_flos()
 
             self.do_log_topk = False
-            self.log(logs)
+            self.log(logs, write_mode='train')
             self.self_eval_cnt+= self.self_train_log_cnt #(self.self_train_log_cnt//self.max_eval_cnt)
 
         metrics = None
@@ -169,14 +171,68 @@ class QuestionAnsweringBaseTrainer(QuestionAnsweringTrainer):
             self._save_checkpoint(model, trial, metrics=metrics)
             self.control = self.callback_handler.on_save(self.args, self.state, self.control)
 
-    def evaluate(self, eval_dataset=None, eval_examples=None, ignore_keys=None):
+    def log(self, logs, eval_gt=None, eval_pred=None, write_mode='eval'):
+        ############
+        # 수정한 부분 : 여긴 아예 많이 고침
+        ############
+
+        # wandb에 저장하는 값들을 위해서 overiding
+        # 이 부분은 evaluation에서
+        if self.state.epoch is not None:
+            logs["epoch"] = round(self.state.epoch, 2)
+
+        output = {**logs, **{"step": self.state.global_step}}
+        self.state.log_history.append(output)
+        # 매번 reset인지는 확인 필요함
+        # # https://github.com/huggingface/transformers/blob/daecae1f1ce02d2dab23742d24f7a66a7d20cb79/src/transformers/trainer_callback.py#L284
+
+        if write_mode == 'eval':
+            # train 이면 _maybe_log_save_evaluate의 self.log 에서 input, prediction을 굳이 넘기진 않기 때문(넘겨오게 할 수도 있지만 굳이?)
+            self.state.log_history.append({'eval_gt': eval_gt})
+            self.state.log_history.append({'eval_pred': eval_pred})
+        else:
+            self.state.log_history.append({'eval_gt': None})
+            self.state.log_history.append({'eval_pred': None})
+
+        # 여기는 PR curve 기록을 위한 용도임!
+        if self.do_log_topk:
+            self.state.log_history.append({'topk_info': [self.topk_pr_columns, self.topk_pr]})
+        else:
+            self.state.log_history.append({'topk_info':None})
+
+        self.state.log_history.append({'write_mode': write_mode})
+
+        # callback_hanlder.on_log가 돌아가면 trainer_callback.py에서 train/logs 값으로 on_log를 호출하는 것 같다..!
+        # customWandb 를 넣어주는데 wandbCallback이 기본으로 들어가있음 -> 위에서 pop 시켜줌
+        self.control = self.callback_handler.on_log(self.args, self.state, self.control, logs)
+
+
+    def evaluate(self, eval_dataset=None, eval_examples=None, ignore_keys=None, df=None):
         eval_dataset = self.eval_dataset if eval_dataset is None else eval_dataset
         eval_dataloader = self.get_eval_dataloader(eval_dataset)
         eval_examples = self.eval_examples if eval_examples is None else eval_examples
+        ############
+        # 수정한 부분
+        ############
+        self.do_log_topk= False
+        if df is not None:
+            self.do_log_topk = True
+            self.topk_pr_columns = ["num_k", "include", "gt_doc", "retrieval_docs", "scores"]
+            self.topk_pr = []
+            for idx in range(len(df)):
+                cur_data = df.iloc[idx]
+                yes = 1 if cur_data.document_id in cur_data.context_id else 0
 
+                self.topk_pr.append([len(df.iloc[idx].context_id),
+                                     yes,
+                                     df.iloc[idx].document_id,
+                                     df.iloc[idx].context_id,
+                                     df.iloc[idx].doc_scores])
+
+        ############
         # 일시적으로 metric computation를 불가능하게 한 상태이며, 해당 코드에서는 loop 내에서 metric 계산을 수행합니다.
         compute_metrics = self.compute_metrics
-        # self.compute_metrics = None
+        self.compute_metrics = None
 
         try:
             output = self.prediction_loop(
@@ -201,8 +257,11 @@ class QuestionAnsweringBaseTrainer(QuestionAnsweringTrainer):
                 eval_examples, eval_dataset, output.predictions, self.args
             )
             metrics = self.compute_metrics(eval_preds)
-
-            self.log(metrics)
+            ############
+            # 수정한 부분
+            ############
+            metrics.update({'loss': output.metrics['eval_loss']})
+            self.log(metrics, eval_gt=eval_examples, eval_pred = eval_preds, write_mode='eval')
         else:
             metrics = {}
 
@@ -210,9 +269,12 @@ class QuestionAnsweringBaseTrainer(QuestionAnsweringTrainer):
             # tpu-comment: PyTorch/XLA에 대한 Logging debug metrics (compile, execute times, ops, etc.)
             xm.master_print(met.metrics_report())
 
-        self.control = self.callback_handler.on_evaluate(
-            self.args, self.state, self.control, metrics
-        )
+        ############
+        # 수정한 부분
+        ############
+        # self.control = self.callback_handler.on_evaluate(
+        #     self.args, self.state, self.control, metrics
+        # )
         return metrics
 
     def predict(self, test_dataset, test_examples, ignore_keys=None):
