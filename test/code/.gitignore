@@ -1,0 +1,17 @@
+.*
+
+#do not ignore
+!.gitignore
+*.json
+
+wandb/
+__pycache__/
+nohup.out
+
+*.csv
+assets/
+models/
+outputs/
+data/
+model_dir/
+test_json_results/
