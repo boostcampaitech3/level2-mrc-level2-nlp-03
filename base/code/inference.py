@@ -55,10 +55,6 @@ def main():
     print(f"model is from {model_args.model_name_or_path}")
     print(f"data is from {dataset_full_path}")
 
-    # 이전 outputs 삭제
-    if os.path.exists('./outputs'):
-        os.rmdir(dir_path)
-
     # logging 설정
     logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(name)s -   %(message)s",

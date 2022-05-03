@@ -46,10 +46,10 @@ def main():
     print(f"data is from {dataset_full_path}")
 
     # 기존 학습 기록 삭제
-    if os.path.exists('./models'):
-        os.rmdir('./models')
-    if os.path.exists('./wandb'):
-        os.rmdir('./wandb')
+    #if os.path.exists('./models'):
+    #    os.rmdir('./models')
+    #if os.path.exists('./wandb'):
+    #    os.rmdir('./wandb')
     
 
     # wandb 설절
