@@ -6,7 +6,7 @@ class SettingArguments:
     """
     Arguments pertaining to basic setting(basic_env, wandb)
     """
-
+    
     device: str = field(
         default='cuda:0',
         metadata={
@@ -34,7 +34,6 @@ class ModelArguments:
     """
     Arguments pertaining to which model/config/tokenizer we are going to fine-tune from.
     """
-
     model_name_or_path: str = field(
         default="klue/bert-base",
         metadata={
@@ -78,7 +77,7 @@ class DataTrainingArguments:
         metadata={"help": "The number of processes to use for the preprocessing."},
     )
     max_seq_length: int = field(
-        default=384,
+        default=512,
         metadata={
             "help": "The maximum total input sequence length after tokenization. Sequences longer "
             "than this will be truncated, sequences shorter will be padded."
@@ -120,6 +119,9 @@ class DataTrainingArguments:
     )
     use_faiss: bool = field(
         default=False, metadata={"help": "Whether to build with faiss"}
+    )
+    add_tokens : bool = field(
+        default=False, metadata={"help": "Whether to add 'question'and 'context' tokens"}
     )
 
 
