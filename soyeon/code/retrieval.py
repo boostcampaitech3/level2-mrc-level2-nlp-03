@@ -182,7 +182,9 @@ class SparseRetrieval:
             for idx, example in enumerate(
                 tqdm(query_or_dataset, desc="Sparse retrieval: ")
             ):
-
+                ########################
+                #### 수정
+                #######################
                 tmp = {
                     # Query와 해당 id를 반환합니다.
                     "question": example["question"],
