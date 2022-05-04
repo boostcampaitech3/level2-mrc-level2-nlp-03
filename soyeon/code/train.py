@@ -34,10 +34,10 @@ def main():
         (SettingArguments, ModelArguments, DataTrainingArguments, TrainingArguments)
     )
     setting_args, model_args, data_args, training_args = parser.parse_args_into_dataclasses()
-    training_args.eval_steps= 400
+    training_args.eval_steps= 4
     training_args.evaluation_strategy = 'steps'
-    training_args.logging_steps = 400
-    training_args.save_steps = 400
+    training_args.logging_steps = 4
+    training_args.save_steps = 4
     training_args.report_to = ['wandb']
 
     print(setting_args)

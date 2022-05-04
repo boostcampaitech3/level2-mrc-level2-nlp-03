@@ -137,7 +137,7 @@ class QuestionAnsweringBaseTrainer(QuestionAnsweringTrainer):
             #     xm.mark_step()
 
             logs = {}
-
+            breakpoint()
             # all_gather + mean() to get average loss over all processes
             tr_loss_scalar = self._nested_gather(tr_loss).mean().item()
 
