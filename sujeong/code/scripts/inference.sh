@@ -6,6 +6,8 @@ python inference.py \
 --model_name_or_path ./models/train_dataset/ \
 --use_wandb True \
 --do_predict True \
---do_eval True \
---overwrite_output_dir True
+--do_eval False \
+--overwrite_output_dir True \
 --add_tokens False
+
+

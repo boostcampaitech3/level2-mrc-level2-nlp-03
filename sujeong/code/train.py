@@ -37,7 +37,7 @@ def main():
     training_args.eval_steps= 400
     training_args.evaluation_strategy = 'steps'
     training_args.logging_steps = 400
-    training_args.save_steps = 400
+    training_args.save_steps = 400 
     training_args.report_to = ['wandb']
 
     print(setting_args)

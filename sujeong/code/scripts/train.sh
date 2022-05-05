@@ -5,7 +5,7 @@ python train.py \
 --use_wandb True \
 --do_train True \
 --do_eval True \
---exp_name bert-base-add_tokens \
+--exp_name add_tokens \
 --model_name_or_path klue/bert-base \
 --overwrite_cache True \
 --add_tokens False

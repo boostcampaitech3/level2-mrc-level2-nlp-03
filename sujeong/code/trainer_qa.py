@@ -130,6 +130,7 @@ class QuestionAnsweringBaseTrainer(QuestionAnsweringTrainer):
         self.self_eval_check_mode = True if kwargs['args'].evaluation_strategy =='steps' else False
         # self.callback_handler.callbacks.pop(2) # 아래와 같은 상황에서 WandbCallback 제거
         # [<transformers.trainer_callback.DefaultFlowCallback object at 0x7f333f3a3370>, <transformers.integrations.TensorBoardCallback object at 0x7f333f3a33d0>, <transformers.integrations.WandbCallback object at 0x7f333f3a35b0>, <custom.base_callback.customBaseWandbCallback object at 0x7f333f3a3490>, <transformers.trainer_callback.ProgressCallback object at 0x7f333f3a3430>]
+        self.do_log_topk = False
 
     def _maybe_log_save_evaluate(self, tr_loss, model, trial, epoch, ignore_keys_for_eval=None):
         if self.control.should_log:
