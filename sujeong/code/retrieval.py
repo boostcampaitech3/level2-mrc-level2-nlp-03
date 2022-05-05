@@ -36,15 +36,11 @@ class SparseRetrieval:
                 - lambda x: x.split(' ')
                 - Huggingface Tokenizer
                 - konlpy.tag의 Mecab
-
             data_path:
                 데이터가 보관되어 있는 경로입니다.
-
             context_path:
                 Passage들이 묶여있는 파일명입니다.
-
             data_path/context_path가 존재해야합니다.
-
         Summary:
             Passage 파일을 불러오고 TfidfVectorizer를 선언하는 기능을 합니다.
         """
@@ -105,7 +101,6 @@ class SparseRetrieval:
             속성으로 저장되어 있는 Passage Embedding을
             Faiss indexer에 fitting 시켜놓습니다.
             이렇게 저장된 indexer는 `get_relevant_doc`에서 유사도를 계산하는데 사용됩니다.
-
         Note:
             Faiss는 Build하는데 시간이 오래 걸리기 때문에,
             매번 새롭게 build하는 것은 비효율적입니다.
@@ -148,11 +143,9 @@ class SparseRetrieval:
                 이 경우 `get_relevant_doc_bulk`를 통해 유사도를 구합니다.
             topk (Optional[int], optional): Defaults to 1.
                 상위 몇 개의 passage를 사용할 것인지 지정합니다.
-
         Returns:
             1개의 Query를 받는 경우  -> Tuple(List, List)
             다수의 Query를 받는 경우 -> pd.DataFrame: [description]
-
         Note:
             다수의 Query를 받는 경우,
                 Ground Truth가 있는 Query (train/valid) -> 기존 Ground Truth Passage를 같이 반환합니다.
@@ -182,6 +175,9 @@ class SparseRetrieval:
             for idx, example in enumerate(
                 tqdm(query_or_dataset, desc="Sparse retrieval: ")
             ):
+                ########################
+                #### 수정
+                #######################
                 tmp = {
                     # Query와 해당 id를 반환합니다.
                     "question": example["question"],
@@ -191,11 +187,16 @@ class SparseRetrieval:
                     "context": " ".join(
                         [self.contexts[pid] for pid in doc_indices[idx]]
                     ),
+                    "doc_scores":doc_scores[idx] # doc score도 추가
                 }
-                if "context" in example.keys() and "answers" in example.keys():
+                if "context" in example.keys() and "answers" and "title" and 'document_id' in example.keys():
                     # validation 데이터를 사용하면 ground_truth context와 answer도 반환합니다.
                     tmp["original_context"] = example["context"]
                     tmp["answers"] = example["answers"]
+
+                    tmp['title'] = example['title']
+                    tmp['document_id'] = example['document_id']
+
                 total.append(tmp)
 
             cqas = pd.DataFrame(total)
@@ -272,11 +273,9 @@ class SparseRetrieval:
                 이 경우 `get_relevant_doc_bulk`를 통해 유사도를 구합니다.
             topk (Optional[int], optional): Defaults to 1.
                 상위 몇 개의 passage를 사용할 것인지 지정합니다.
-
         Returns:
             1개의 Query를 받는 경우  -> Tuple(List, List)
             다수의 Query를 받는 경우 -> pd.DataFrame: [description]
-
         Note:
             다수의 Query를 받는 경우,
                 Ground Truth가 있는 Query (train/valid) -> 기존 Ground Truth Passage를 같이 반환합니다.
