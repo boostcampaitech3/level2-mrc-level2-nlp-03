@@ -5,7 +5,7 @@ python train.py \
 --use_wandb True \
 --do_train True \
 --do_eval True \
---exp_name roberta-large \
+--exp_name clean_roberta \
 --model_name_or_path klue/roberta-large \
 --overwrite_cache True \
 --overwrite_output_dir True \

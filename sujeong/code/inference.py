@@ -116,13 +116,6 @@ def main():
         from_tf=bool(".ckpt" in model_args.model_name_or_path),
         config=config,
     )
-    
-    # add 'question' and 'context' tokens
-    if data_args.add_tokens:
-        special_tokens_dict = {'additional_special_tokens': ['question','context']}
-        num_added_toks = tokenizer.add_special_tokens(special_tokens_dict)
-
-        #model.resize_token_embeddings(len(tokenizer))
 
     # True일 경우 : run passage retrieval
     if data_args.eval_retrieval:
@@ -220,6 +213,14 @@ def run_mrc(
     # (question|context) 혹은 (context|question)로 세팅 가능합니다.
     pad_on_right = tokenizer.padding_side == "right"
 
+    # add 'question' and 'context' tokens
+    #if data_args.add_tokens:
+    #    special_tokens_dict = {'additional_special_tokens': ['question','context']}
+    #    num_added_toks = tokenizer.add_special_tokens(special_tokens_dict)
+
+    #    model.resize_token_embeddings(tokenizer.vocab_size + num_added_toks)
+    #    tokenizer.save_pretrained(training_args.output_dir)
+
     # 오류가 있는지 확인합니다.
     last_checkpoint, max_seq_length = check_no_error(
         data_args, training_args, datasets, tokenizer
@@ -232,9 +233,9 @@ def run_mrc(
         if data_args.add_tokens:
             print("adding_tokens...")
             q = examples[question_column_name]
-            c = examples[context_column_name]
-            examples[question_column_name] = ['question ' + x for x in q]
-            examples[context_column_name] = ['context' + x for x in c]
+            #c = examples[context_column_name]
+            examples[question_column_name] = ['질문 ' + x for x in q]
+            #examples[context_column_name] = ['context' + x for x in c]
 
         tokenized_examples = tokenizer(
             examples[question_column_name if pad_on_right else context_column_name],
@@ -247,6 +248,9 @@ def run_mrc(
             # return_token_type_ids=False, # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
             padding="max_length" if data_args.pad_to_max_length else False,
         )
+
+        # (question|context) 혹은 (context|question) 순서 확인용 
+        print(tokenizer.decode(tokenized_examples['input_ids'][0]))
 
         # 길이가 긴 context가 등장할 경우 truncate를 진행해야하므로, 해당 데이터셋을 찾을 수 있도록 mapping 가능한 값이 필요합니다.
         sample_mapping = tokenized_examples.pop("overflow_to_sample_mapping")
@@ -335,9 +339,9 @@ def run_mrc(
         # 각 example들은 이전의 context와 조금씩 겹치게됩니다.
         if data_args.add_tokens:
             q = examples[question_column_name]
-            c = examples[context_column_name]
-            examples[question_column_name] = ['question ' + x for x in q]
-            examples[context_column_name] = ['context' + x for x in c]
+            #c = examples[context_column_name]
+            examples[question_column_name] = ['질문 ' + x for x in q]
+            #examples[context_column_name] = ['context' + x for x in c]
 
         tokenized_examples = tokenizer(
             examples[question_column_name if pad_on_right else context_column_name],
@@ -350,6 +354,10 @@ def run_mrc(
             # return_token_type_ids=False, # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
             padding="max_length" if data_args.pad_to_max_length else False,
         )
+
+        # (question|context) 혹은 (context|question) 순서 확인용 
+        print(tokenizer.decode(tokenized_examples['input_ids'][0]))
+        print(tokenizer.tokenize("질문과 지문"))
 
         # 길이가 긴 context가 등장할 경우 truncate를 진행해야하므로, 해당 데이터셋을 찾을 수 있도록 mapping 가능한 값이 필요합니다.
         sample_mapping = tokenized_examples.pop("overflow_to_sample_mapping")
