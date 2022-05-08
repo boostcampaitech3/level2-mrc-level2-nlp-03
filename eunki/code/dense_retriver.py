@@ -11,7 +11,7 @@ from torch.utils.data import (DataLoader, RandomSampler, TensorDataset)
 from transformers import AutoTokenizer, BertModel, BertPreTrainedModel, AdamW, TrainingArguments, get_linear_schedule_with_warmup
 from datasets import Dataset, load_from_disk, concatenate_datasets
 
-from retrieval_base import SparseRetrieval, timer
+from retrieval import SparseRetrieval, timer
 from pathos.multiprocessing import ProcessingPool as Pool
 
 retriever = None 
@@ -250,16 +250,28 @@ class DenseRetrieval(SparseRetrieval):
                 torch.cuda.empty_cache()
 
             # wandb.log
-            if self.wandb==True:
-                self.get_dense_embedding()
-                topK_list = [1,10,20,50]
-                result_train = self.topk_experiment(topK_list, self.org_dataset['train'], datatset_name="train")
-                result_valid = self.topk_experiment(topK_list, self.org_dataset['validation'], datatset_name="valid")
-                result_train.update(result_valid)
-                wandb.log(result_train)
+            # if self.wandb==True:
+            #     self.get_dense_embedding()
+            #     topK_list = [1,10,20,50]
+            #     result_train = self.topk_experiment(topK_list, self.org_dataset['train'], datatset_name="train")
+            #     result_valid = self.topk_experiment(topK_list, self.org_dataset['validation'], datatset_name="valid")
+            #     result_train.update(result_valid)
+            #     wandb.log(result_train)
+            topK_list = [1,10,20,50]
+            result_train = self.topk_experiment(topK_list, self.org_dataset['train'], datatset_name="train")
+            result_valid = self.topk_experiment(topK_list, self.org_dataset['validation'], datatset_name="valid")
+            print(result_train)
+            print(result_valid)
 
             torch.save(self.p_encoder.state_dict(), f"./outputs/dpr/p_encoder_{epoch}.pt")
             torch.save(self.q_encoder.state_dict(), f"./outputs/dpr/q_encoder_{epoch}.pt")
+            
+            # k의 설정을 몇을 할 것이냐에 따라 설정을 수정해보고자 한다.
+            # if result_valid['map@1'] > self.best_map:
+            #     makedirs("./outputs/dpr/best", exist_ok=True)
+            #     torch.save(self.p_encoder.state_dict(), f"./outputs/best/dpr/p_encoder.pt")
+            #     torch.save(self.q_encoder.state_dict(), f"./outputs/best/dpr/q_encoder.pt")
+
         return self.p_encoder, self.q_encoder
 
     def load_model(self, model_checkpoint, p_path, q_path):
@@ -375,7 +387,7 @@ if __name__=="__main__":
     dense_retriever = DenseRetrieval(tokenize_fn=tokenizer.tokenize, data_path = data_path, 
                                     context_path = context_path, dataset_path=dataset_path, 
                                     tokenizer=tokenizer, train_data=org_dataset['train'], 
-                                    num_neg=12, is_bm25=False, wandb=False)
+                                    num_neg=12, is_bm25=True, wandb=False)
     retriever = dense_retriever
     args = TrainingArguments(
         output_dir="dense_retireval",
@@ -383,7 +395,7 @@ if __name__=="__main__":
         learning_rate=8e-6,
         per_device_train_batch_size=2,
         per_device_eval_batch_size=2,
-        num_train_epochs=1,
+        num_train_epochs=15,
         weight_decay=0.01,
     )
 
@@ -394,10 +406,7 @@ if __name__=="__main__":
     dense_retriever.train(args, train_dataset)
 
     ## 추론준비 ##
-    # dense_retriever.load_model(model_checkpoint, "data/p_encoder_14.pt", "data/q_encoder_14.pt")
     dense_retriever.get_dense_embedding()
-    # with open("./data/dense_embedding.bin", "rb") as f: # dense_embedding 한번 실행후 진행
-    #     dense_retriever.dense_p_embedding = pickle.load(f)
 
     ## 추론 ##
     for i in range(10):
