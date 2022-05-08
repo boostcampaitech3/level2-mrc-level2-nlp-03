@@ -11,7 +11,7 @@
 # ***주의*** : 해당 코드로 저장되는 predictions.json은 test dataset의 결과물이 아니기 때문에 
 #             리더보드에 제출하면 안됩니다..!(이 파일은 outputs/valid_dataset/에 저장됩니다. )
 
-python inference_validate.py \
+python inference.py \
 --output_dir ./outputs/valid_dataset/ \
 --dataset_name train_dataset/ \
 --model_name_or_path ./models/train_dataset/ \
