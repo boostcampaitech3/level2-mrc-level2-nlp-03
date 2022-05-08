@@ -1,6 +1,5 @@
-from dataclasses import dataclass, field
-from typing import Optional
-
+from dataclasses import asdict, dataclass, field
+from typing import Any, Dict, List, Optional
 
 @dataclass
 class ModelArguments:
@@ -9,7 +8,7 @@ class ModelArguments:
     """
 
     model_name_or_path: str = field(
-        default="klue/bert-base",
+        default="klue/roberta-large",
         metadata={
             "help": "Path to pretrained model or model identifier from huggingface.co/models"
         },
@@ -26,7 +25,23 @@ class ModelArguments:
             "help": "Pretrained tokenizer name or path if not the same as model_name"
         },
     )
+    resume: bool = field(
+        default=False, 
+        metadata={"help": "resume checkout"}
+    ) 
 
+    dpr_q_encoder_path : Optional[str] = field(
+        default="./outputs/dpr/best_p_enc_model.pt",
+        metadata={
+            "help": "Pretrained tokenizer name or path if not the same as model_name"
+        },
+    )
+    dpr_p_encoder_path : Optional[str] = field(
+        default="./outputs/dpr/best_p_enc_model.pt",
+        metadata={
+            "help": "Pretrained tokenizer name or path if not the same as model_name"
+        },
+    )
 
 @dataclass
 class DataTrainingArguments:
@@ -82,11 +97,33 @@ class DataTrainingArguments:
         default=64, metadata={"help": "Define how many clusters to use for faiss."}
     )
     top_k_retrieval: int = field(
-        default=10,
+        default=20,
         metadata={
             "help": "Define how many top-k passages to retrieve based on similarity."
         },
     )
     use_faiss: bool = field(
         default=False, metadata={"help": "Whether to build with faiss"}
+    )
+    bm25: bool = field(
+        default=True,
+        metadata={"help": "Run bm25 for default retrival"}
+    )
+
+    use_wiki_preprocessing: bool = field (
+        default=False,
+        metadata={
+            "help": "Preprocess wiki documents"
+        },
+    )
+    use_augment: int = field(
+        default=0, metadata={"help": "0->none, 1->why, 2-> how, 3->all"}
+    )
+    dpr: bool = field(
+        default=True,
+        metadata={"help": "Run dpr+bm25 for default retrival"}
+    )
+    dpr_negative: bool = field(
+        default=False,
+        metadata={"help": "Run DenseRetrieval.py with negative sample"}
     )
