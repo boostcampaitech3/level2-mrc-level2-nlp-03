@@ -2,3 +2,5 @@ __pycache__
 nohup.out
 data
 models/
+*.pt
+events.*

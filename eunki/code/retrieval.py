@@ -11,6 +11,9 @@ import pandas as pd
 from datasets import Dataset, concatenate_datasets, load_from_disk
 from sklearn.feature_extraction.text import TfidfVectorizer
 from tqdm.auto import tqdm
+# pip install rank_bm25을 통해서 먼저 설치해주시면 됩니다.
+import rank_bm25
+from dpr_score import get_dpr_score
 
 
 @contextmanager
@@ -19,6 +22,47 @@ def timer(name):
     yield
     print(f"[{name}] done in {time.time() - t0:.3f} s")
 
+def par_search(queries, topk):
+    # pool을 통해서 wrapper로 묶어 여러 query(batch)를 동시에 처리할 수 있습니다.
+    def wrapper(query): 
+        rel_doc = retriever.get_relevant_doc(query, k = topk)
+        return rel_doc
+    pool = Pool()
+
+    pool.restart() 
+
+    rel_docs_score_indices = pool.map(wrapper, queries)
+    pool.close()
+    pool.join()
+
+    doc_scores = []
+    doc_indices = []
+    for s,idx in rel_docs_score_indices:
+        doc_scores.append( s )
+        doc_indices.append( idx )
+
+    return doc_scores, doc_indices
+
+
+
+class MyBm25(rank_bm25.BM25Okapi): 
+                                                                      
+    def __init__(self, corpus, tokenizer=None, k1=1.5, b=0.75, epsilon=0.25):
+        # 논문에 따르면 k1은 1.2~1.5가 적당하다. 또한 b의 경우에도 0.75~0.9가 적당하다.
+        # GridSearchCV를 통해서 최적의 값을 찾아보고 정의하는 것이 좋을 듯 하다.
+            super().__init__(corpus, tokenizer=tokenizer, k1=k1, b=b, epsilon=epsilon)    
+    
+    def get_top_n(self, query, documents, n=5):
+        assert self.corpus_size == len(documents), "The documents given don't match the index corpus!"
+
+        scores = self.get_scores(query)
+        # 이미 구현되어 있는 함수를 사용하여 점수를 구한다.
+
+        top_n_idx = np.argsort(scores)[::-1][:n]
+        doc_score = scores[top_n_idx]
+        
+        return doc_score, top_n_idx
+
 
 class SparseRetrieval:
     def __init__(
@@ -26,6 +70,10 @@ class SparseRetrieval:
         tokenize_fn,
         data_path: Optional[str] = "../data/",
         context_path: Optional[str] = "wikipedia_documents.json",
+        k1=1.5, b=0.75, epsilon=0.25,
+        q_encoder = None,
+        p_encoder = None,
+        is_bm25 = False
     ) -> NoReturn:
 
         """
@@ -66,6 +114,15 @@ class SparseRetrieval:
 
         self.p_embedding = None  # get_sparse_embedding()로 생성합니다
         self.indexer = None  # build_faiss()로 생성합니다.
+        self.bm25 = None
+        self.is_bm25 = is_bm25
+        self.k1 = k1
+        self.b = b
+        self.epsilon = epsilon
+
+        #encoder for dpr
+        self.q_encoder = q_encoder
+        self.p_encoder = p_encoder
 
     def get_sparse_embedding(self) -> NoReturn:
 
@@ -75,28 +132,49 @@ class SparseRetrieval:
             TFIDF와 Embedding을 pickle로 저장합니다.
             만약 미리 저장된 파일이 있으면 저장된 pickle을 불러옵니다.
         """
-
+        if not self.is_bm25: # tfidf를 사용하는 경우
         # Pickle을 저장합니다.
-        pickle_name = f"sparse_embedding.bin"
-        tfidfv_name = f"tfidv.bin"
-        emd_path = os.path.join(self.data_path, pickle_name)
-        tfidfv_path = os.path.join(self.data_path, tfidfv_name)
+            pickle_name = f"sparse_embedding.bin"
+            tfidfv_name = f"tfidv.bin"
+            emd_path = os.path.join(self.data_path, pickle_name)
+            tfidfv_path = os.path.join(self.data_path, tfidfv_name)
 
-        if os.path.isfile(emd_path) and os.path.isfile(tfidfv_path):
-            with open(emd_path, "rb") as file:
-                self.p_embedding = pickle.load(file)
-            with open(tfidfv_path, "rb") as file:
-                self.tfidfv = pickle.load(file)
-            print("Embedding pickle load.")
-        else:
-            print("Build passage embedding")
-            self.p_embedding = self.tfidfv.fit_transform(self.contexts)
-            print(self.p_embedding.shape)
-            with open(emd_path, "wb") as file:
-                pickle.dump(self.p_embedding, file)
-            with open(tfidfv_path, "wb") as file:
-                pickle.dump(self.tfidfv, file)
-            print("Embedding pickle saved.")
+            if os.path.isfile(emd_path) and os.path.isfile(tfidfv_path):
+                with open(emd_path, "rb") as file:
+                    self.p_embedding = pickle.load(file)
+                with open(tfidfv_path, "rb") as file:
+                    self.tfidfv = pickle.load(file)
+                print("Embedding pickle load.")
+            else:
+                print("Build passage embedding")
+                self.p_embedding = self.tfidfv.fit_transform(self.contexts)
+                print(self.p_embedding.shape)
+                with open(emd_path, "wb") as file:
+                    pickle.dump(self.p_embedding, file)
+                with open(tfidfv_path, "wb") as file:
+                    pickle.dump(self.tfidfv, file)
+                print("Embedding pickle saved.")
+        
+        else: # bm25
+            bm25_name = f"bm25.bin"
+            bm25_path = os.path.join(self.data_path, bm25_name)
+            if os.path.isfile(bm25_path):
+                with open(bm25_path, "rb") as file:
+                    self.bm25 = pickle.load(file)
+                print("Embedding bm25 pickle load.")
+            else:
+                print("Building bm25... It may take 1 minute and 30 seconds...")
+                # bm25 must tokenizer first 
+                # because it runs pool inside and this cuases unexpected result.
+                tokenized_corpus = []
+                for c in tqdm(self.contexts):
+                    tokenized_corpus.append(self.tokenize_fn(c))
+                self.bm25 = MyBm25(tokenized_corpus, k1 = self.k1, b = self.b, epsilon=self.epsilon)
+                # bm25 클래스를 불러와서 실행합니다.
+                
+                with open(bm25_path, "wb") as file:
+                    pickle.dump(self.bm25, file)
+                print("bm25 pickle saved.")
 
     def build_faiss(self, num_clusters=64) -> NoReturn:
 
@@ -134,6 +212,56 @@ class SparseRetrieval:
             self.indexer.add(p_emb)
             faiss.write_index(self.indexer, indexer_path)
             print("Faiss Indexer Saved.")
+    
+    def retrieve_dpr(self, dataset, topk: Optional[int] = 20):
+        print("dpr mode!")
+        tokenizer = AutoTokenizer.from_pretrained("klue/bert-base")
+        # 예측을 통해 생성된 score df를 얻는다.
+        dpr_score = get_dpr_score(dataset['question'], self.contexts, tokenizer,self.p_encoder, self.q_encoder)
+
+        bm25_score = []
+        for query in dataset['question']:
+            tok_q = self.tokenize_fn(query)
+            bm25_score.append(self.bm25.get_scores(tok_q))
+        bm25_score = torch.tensor(np.array(bm25_score))
+        dpr_score = softmax(dpr_score,dim=1)
+        bm25_score = softmax(bm25_score,dim=1)
+
+        total_score = []
+        for idx in range(len(dataset['question'])):
+            total_score.append((dpr_score[idx]*0.2+bm25_score[idx]).tolist())
+        total_score = torch.tensor(np.array(total_score))
+        ranks = torch.argsort(total_score, dim=1, descending=True).squeeze()
+        context_list = []
+        for index in range(len(ranks)):
+            k_list = []
+            for i in range(topk):
+                k_list.append(self.contexts[ranks[index][i]])
+            context_list.append(k_list)
+                
+        total = []
+        for idx, example in enumerate(
+            tqdm(dataset, desc="Sparse retrieval: ")
+        ):
+            tmp = {
+                # Query와 해당 id를 반환합니다.
+                "question": example["question"],
+                "id": example["id"],
+                # Retrieve한 Passage의 id, context를 반환합니다.
+                "context_id": ranks[idx][:topk],
+                "context": " ".join(
+                    context_list[idx]
+                ),
+            }
+            # if "context" in example.keys() and "answers" in example.keys():
+            #     # validation 데이터를 사용하면 ground_truth context와 answer도 반환합니다.
+            #     tmp["original_context"] = example["context"]
+            #     tmp["answers"] = example["answers"]
+            total.append(tmp)
+
+        cqas = pd.DataFrame(total)
+        return cqas
+
 
     def retrieve(
         self, query_or_dataset: Union[str, Dataset], topk: Optional[int] = 1
