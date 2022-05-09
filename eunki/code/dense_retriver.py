@@ -54,7 +54,7 @@ class DenseRetrieval(SparseRetrieval):
         기존에서 p_embedding, contexts, tfidfv를 가져옵니다.
         arguments: train_data: 기존 wiki데이터가 아닌 특정데이터를 활용할때 추가
     """
-    def __init__(self, tokenize_fn, data_path, context_path, dataset_path, tokenizer, train_data, num_neg, is_bm25=False, wandb=False):
+    def __init__(self, tokenize_fn, data_path, context_path, dataset_path, tokenizer, train_data, num_neg, is_bm25=True, wandb=False):
         super().__init__(tokenize_fn, data_path, context_path)
         self.is_bm25 = is_bm25
         self.tokenize_fn = tokenize_fn
@@ -419,7 +419,7 @@ if __name__=="__main__":
 
     ## 추론 ##
     for i in range(10):
-        df = dense_retriever.retrieve(org_dataset['validation'][i]['question'], topk=3)
+        df = dense_retriever.retrieve_dpr(org_dataset['validation'][i]['question'], topk=3)
         print(df)
 
     ## topk 출력 ##
