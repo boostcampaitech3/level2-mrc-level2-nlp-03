@@ -172,6 +172,7 @@ class SparseRetrieval:
                 doc_scores, doc_indices = self.get_relevant_doc_bulk(
                     query_or_dataset["question"], k=topk
                 )
+            print("Start Retrieval...")
             for idx, example in enumerate(
                 tqdm(query_or_dataset, desc="Sparse retrieval: ")
             ):
@@ -307,6 +308,7 @@ class SparseRetrieval:
                 doc_scores, doc_indices = self.get_relevant_doc_bulk_faiss(
                     queries, k=topk
                 )
+            print("Start Retrieval...")
             for idx, example in enumerate(
                 tqdm(query_or_dataset, desc="Sparse retrieval: ")
             ):
