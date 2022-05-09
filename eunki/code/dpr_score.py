@@ -1,3 +1,8 @@
+from transformers import BertConfig
+from transformers import is_torch_available, PreTrainedTokenizerFast, TrainingArguments,BertPreTrainedModel,BertModel
+import torch
+import os
+
 def get_dpr_score(query, contexts, tokenizer, p_encoder_path, q_encoder_path):
     p_encoder = BertEncoder.from_pretrained("klue/bert-base")
     q_encoder = BertEncoder.from_pretrained("klue/bert-base")
