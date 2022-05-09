@@ -8,6 +8,10 @@ Open-Domain Question Answering 을 수행하는 inference 코드 입니다.
 import logging
 import sys
 from typing import Callable, Dict, List, NoReturn, Tuple
+from pathos.multiprocessing import ProcessingPool as Pool
+import pandas as pd
+import time
+import pickle
 
 import numpy as np
 from arguments import DataTrainingArguments, ModelArguments
@@ -33,6 +37,9 @@ from transformers import (
     set_seed,
 )
 from utils_qa import check_no_error, postprocess_qa_predictions
+
+from retrieval import SparseRetrieval
+from dense_retriever import DenseRetrieval
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +96,7 @@ def main():
     # True일 경우 : run passage retrieval
     if data_args.eval_retrieval:
         datasets = run_sparse_retrieval(
-            tokenizer.tokenize, datasets, training_args, data_args,
+            tokenizer.tokenize, datasets, training_args, data_args, p_encoder= p_encoder, q_encoder = p_encoder
         )
 
     # eval or predict mrc model
@@ -104,13 +111,28 @@ def run_sparse_retrieval(
     data_args: DataTrainingArguments,
     data_path: str = "../data",
     context_path: str = "wikipedia_documents.json",
+    p_encoder = None,
+    q_encoder = None
 ) -> DatasetDict:
 
     # Query에 맞는 Passage들을 Retrieval 합니다.
-    retriever = SparseRetrieval(
-        tokenize_fn=tokenize_fn, data_path=data_path, context_path=context_path
-    )
-    retriever.get_sparse_embedding()
+    if not data_args.dpr_negative:
+        retriever = SparseRetrieval(
+            tokenize_fn=tokenize_fn, data_path=data_path, context_path=context_path, is_bm25=data_args.bm25,
+            p_encoder= p_encoder, q_encoder=q_encoder, use_wiki_preprocessing=data_args.use_wiki_preprocessing
+        )
+        retriever.get_sparse_embedding()
+    else:
+        retriever = DenseRetrieval(tokenize_fn=tokenize_fn, data_path = data_path, 
+                                context_path = context_path, dataset_path=data_path+"/train_dataset", 
+                                tokenizer=tokenizer, train_data=datasets["validation"], 
+                                num_neg=12, is_bm25=data_args.bm25)
+
+        model_checkpoint = "klue/bert-base"
+        retriever.load_model(model_checkpoint, "./outputs/dpr/p_encoder_14.pt", "./outputs/dpr/q_encoder_14.pt")
+        retriever.get_dense_embedding()
+        # with open("./data/dense_embedding.bin", "rb") as f: # dense_embedding 한번 실행후 진행
+        # retriever.dense_p_embedding = pickle.load(f)
 
     if data_args.use_faiss:
         retriever.build_faiss(num_clusters=data_args.num_clusters)
@@ -118,7 +140,22 @@ def run_sparse_retrieval(
             datasets["validation"], topk=data_args.top_k_retrieval
         )
     else:
-        df = retriever.retrieve(datasets["validation"], topk=data_args.top_k_retrieval)
+        # if bm25, parallel is faster. ELSE, numpy in TFIDF outperforms the parallel. :/
+        if data_args.bm25:
+            start = time.time()
+            print("Calculating BM25 similarity...")
+            if data_args.dpr : # dpr + bm25 
+                df = retriever.retrieve_dpr(
+                    datasets["validation"], topk=data_args.top_k_retrieval
+                )
+            else:
+                df = retriever.retrieve(
+                    datasets["validation"], topk=data_args.top_k_retrieval
+                )
+            end = time.time()
+            print("Done! similarity processing time :%d secs "%(int(end - start)))
+        else:
+            df = retriever.retrieve(datasets["validation"], topk=data_args.top_k_retrieval)
 
     # test data 에 대해선 정답이 없으므로 id question context 로만 데이터셋이 구성됩니다.
     if training_args.do_predict:
@@ -188,7 +225,7 @@ def run_mrc(
             stride=data_args.doc_stride,
             return_overflowing_tokens=True,
             return_offsets_mapping=True,
-            # return_token_type_ids=False, # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
+            return_token_type_ids=False, # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
             padding="max_length" if data_args.pad_to_max_length else False,
         )
 

@@ -20,7 +20,8 @@ from datasets import (
     load_from_disk,
     load_metric,
 )
-from retrieval import SparseRetrieval
+# from retrieval_base import SparseRetrieval
+from retrieval import DenseRetrieval
 from trainer_qa import QuestionAnsweringTrainer
 from transformers import (
     AutoConfig,
@@ -31,6 +32,9 @@ from transformers import (
     HfArgumentParser,
     TrainingArguments,
     set_seed,
+    BertPreTrainedModel,
+    BertModel,
+    AdamW, get_linear_schedule_with_warmup
 )
 from utils_qa import check_no_error, postprocess_qa_predictions
 
@@ -88,8 +92,9 @@ def main():
 
     # True일 경우 : run passage retrieval
     if data_args.eval_retrieval:
-        datasets = run_sparse_retrieval(
-            tokenizer.tokenize, datasets, training_args, data_args, p_encoder= p_encoder, q_encoder = p_encoder
+        datasets = run_dense_retrieval(
+               tokenize_fn = tokenizer.tokenize, datasets = datasets['validation']['question'], training_args = training_args, data_args = data_args,
+               data_path = "../data", context_path = "wikipedia_documents.json",
         )
 
     # eval or predict mrc model
@@ -97,35 +102,33 @@ def main():
         run_mrc(data_args, training_args, model_args, datasets, tokenizer, model)
 
 
-def run_sparse_retrieval(
+def run_dense_retrieval(
     tokenize_fn: Callable[[str], List[str]],
     datasets: DatasetDict,
     training_args: TrainingArguments,
     data_args: DataTrainingArguments,
     data_path: str = "../data",
     context_path: str = "wikipedia_documents.json",
-    p_encoder = None,
-    q_encoder = None
 ) -> DatasetDict:
 
     # Query에 맞는 Passage들을 Retrieval 합니다.
-    if not data_args.dpr_negative:
-        retriever = SparseRetrieval(
-            tokenize_fn=tokenize_fn, data_path=data_path, context_path=context_path, is_bm25=data_args.bm25,
-            p_encoder= p_encoder, q_encoder=q_encoder, use_wiki_preprocessing=data_args.use_wiki_preprocessing
-        )
-        retriever.get_sparse_embedding()
-    else:
-        retriever = DenseRetrieval(tokenize_fn=tokenize_fn, data_path = data_path, 
-                                context_path = context_path, dataset_path=data_path+"/train_dataset", 
-                                tokenizer=tokenizer, train_data=datasets["validation"], 
-                                num_neg=12, is_bm25=data_args.bm25)
+    
+    args = TrainingArguments(
+        output_dir="../data/",
+        evaluation_strategy="epoch",
+        learning_rate=3e-4,
+        per_device_train_batch_size=2,
+        per_device_eval_batch_size=2,
+        num_train_epochs=2,
+        weight_decay=0.01
+    )
 
-        model_checkpoint = "klue/bert-base"
-        retriever.load_model(model_checkpoint, "./outputs/dpr/p_encoder_14.pt", "./outputs/dpr/q_encoder_14.pt")
-        retriever.get_dense_embedding()
-        # with open("./data/dense_embedding.bin", "rb") as f: # dense_embedding 한번 실행후 진행
-        # retriever.dense_p_embedding = pickle.load(f)
+    model_checkpoint = 'klue/bert-base'
+    tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
+    p_encoder = BertEncoder.from_pretrained(model_checkpoint).to(args.device)
+    q_encoder = BertEncoder.from_pretrained(model_checkpoint).to(args.device)
+
+    retriever = DenseRetrieval(args=args, datasets = datasets, tokenize_fn=tokenizer, data_path = "../data/", context_path = "wikipedia_documents.json", num_neg=2, p_encoder=p_encoder, q_encoder=q_encoder)
 
     if data_args.use_faiss:
         retriever.build_faiss(num_clusters=data_args.num_clusters)
@@ -133,22 +136,8 @@ def run_sparse_retrieval(
             datasets["validation"], topk=data_args.top_k_retrieval
         )
     else:
-        # if bm25, parallel is faster. ELSE, numpy in TFIDF outperforms the parallel. :/
-        if data_args.bm25:
-            start = time.time()
-            print("Calculating BM25 similarity...")
-            if data_args.dpr : # dpr + bm25 
-                df = retriever.retrieve_dpr(
-                    datasets["validation"], topk=data_args.top_k_retrieval
-                )
-            else:
-                df = retriever.retrieve(
-                    datasets["validation"], topk=data_args.top_k_retrieval
-                )
-            end = time.time()
-            print("Done! similarity processing time :%d secs "%(int(end - start)))
-        else:
-            df = retriever.retrieve(datasets["validation"], topk=data_args.top_k_retrieval)
+        # df = retriever.get_relevant_doc(datasets["validation"]["question"], k=data_args.top_k_retrieval)
+        df = retriever.get_relevant_doc(datasets, k=data_args.top_k_retrieval)
 
     # test data 에 대해선 정답이 없으므로 id question context 로만 데이터셋이 구성됩니다.
     if training_args.do_predict:
