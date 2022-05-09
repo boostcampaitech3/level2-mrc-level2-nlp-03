@@ -7,6 +7,9 @@ import logging
 import sys
 from typing import Callable, Dict, List, NoReturn, Tuple
 
+from pathos.multiprocessing import ProcessingPool as Pool
+import pandas as pd
+
 import numpy as np
 from arguments import DataTrainingArguments, ModelArguments, SettingArguments
 from datasets import (
@@ -32,6 +35,9 @@ from transformers import (
 )
 
 import utils_qa
+
+from retrieval import SparseRetrieval
+from dense_retriever import DenseRetrieval
 
 import timeit
 import os
@@ -130,7 +136,7 @@ def main():
     if data_args.eval_retrieval:
         # doc score들 일단 뽑아만 둘려고 df 따로 받아서 run_mrc에 넣어줌
         datasets, df = run_sparse_retrieval(
-            tokenizer.tokenize, datasets, training_args, data_args, data_args.dataset_path
+            tokenizer.tokenize, datasets, training_args, data_args, p_encoder= p_encoder, q_encoder = p_encoder
         )
 
     # eval or predict mrc model
@@ -147,12 +153,27 @@ def run_sparse_retrieval(
         data_args: DataTrainingArguments,
         data_path: str = "../data",
         context_path: str = "wikipedia_documents.json",
+        p_encoder = None,
+        q_encoder = None
 ) -> DatasetDict:
+    
     # Query에 맞는 Passage들을 Retrieval 합니다.
-    retriever = SparseRetrieval(
-        tokenize_fn=tokenize_fn, data_path=data_path, context_path=context_path
-    )
-    retriever.get_sparse_embedding()
+
+    if not data_args.dpr_negative:
+        retriever = SparseRetrieval(
+            tokenize_fn=tokenize_fn, data_path=data_path, context_path=context_path, is_bm25=data_args.bm25,
+            p_encoder= p_encoder, q_encoder=q_encoder, use_wiki_preprocessing=data_args.use_wiki_preprocessing
+        )
+        retriever.get_sparse_embedding()
+    else:
+        retriever = DenseRetrieval(tokenize_fn=tokenize_fn, data_path = data_path, 
+                                context_path = context_path, dataset_path=data_path+"/train_dataset", 
+                                tokenizer=tokenizer, train_data=datasets["validation"], 
+                                num_neg=12, is_bm25=data_args.bm25)
+
+        model_checkpoint = "klue/bert-base"
+        retriever.load_model(model_checkpoint, "./outputs/dpr/p_encoder_14.pt", "./outputs/dpr/q_encoder_14.pt")
+        retriever.get_dense_embedding()
 
     if data_args.use_faiss:
         retriever.build_faiss(num_clusters=data_args.num_clusters)
@@ -160,7 +181,22 @@ def run_sparse_retrieval(
             datasets["validation"], topk=data_args.top_k_retrieval
         )
     else:
-        df = retriever.retrieve(datasets["validation"], topk=data_args.top_k_retrieval)
+        # if bm25, parallel is faster. ELSE, numpy in TFIDF outperforms the parallel. :/
+        if data_args.bm25:
+            start = time.time()
+            print("Calculating BM25 similarity...")
+            if data_args.dpr : # dpr + bm25 
+                df = retriever.retrieve_dpr(
+                    datasets["validation"], topk=data_args.top_k_retrieval
+                )
+            else:
+                df = retriever.retrieve(
+                    datasets["validation"], topk=data_args.top_k_retrieval
+                )
+            end = time.time()
+            print("Done! similarity processing time :%d secs "%(int(end - start)))
+        else:
+            df = retriever.retrieve(datasets["validation"], topk=data_args.top_k_retrieval)
 
     # retrieval return에서 doc score도 return하도록 함!
     # 만약 top-k의 성능을 보고 싶으면 여기서 멈춰도 될듯?
