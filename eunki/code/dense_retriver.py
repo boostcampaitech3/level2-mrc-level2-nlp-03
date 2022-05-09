@@ -257,7 +257,8 @@ class DenseRetrieval(SparseRetrieval):
             #     result_valid = self.topk_experiment(topK_list, self.org_dataset['validation'], datatset_name="valid")
             #     result_train.update(result_valid)
             #     wandb.log(result_train)
-            topK_list = [1,10,20,50]
+            topK_list = [1,10,20,30,50]
+            self.get_dense_embedding()
             result_train = self.topk_experiment(topK_list, self.org_dataset['train'], datatset_name="train")
             result_valid = self.topk_experiment(topK_list, self.org_dataset['validation'], datatset_name="valid")
             print(result_train)
@@ -267,10 +268,15 @@ class DenseRetrieval(SparseRetrieval):
             torch.save(self.q_encoder.state_dict(), f"./outputs/dpr/q_encoder_{epoch}.pt")
             
             # k의 설정을 몇을 할 것이냐에 따라 설정을 수정해보고자 한다.
-            # if result_valid['map@1'] > self.best_map:
+            # if result_valid[''] > self.best_map:
             #     makedirs("./outputs/dpr/best", exist_ok=True)
-            #     torch.save(self.p_encoder.state_dict(), f"./outputs/best/dpr/p_encoder.pt")
-            #     torch.save(self.q_encoder.state_dict(), f"./outputs/best/dpr/q_encoder.pt")
+            #     torch.save(self.p_encoder.state_dict(), f"./outputs/best/dpr/p_encoder_20.pt")
+            #     torch.save(self.q_encoder.state_dict(), f"./outputs/best/dpr/q_encoder_20.pt")
+            
+            # if result_valid[''] > self.best_map:
+            #     makedirs("./outputs/dpr/best", exist_ok=True)
+            #     torch.save(self.p_encoder.state_dict(), f"./outputs/best/dpr/p_encoder_20.pt")
+            #     torch.save(self.q_encoder.state_dict(), f"./outputs/best/dpr/q_encoder_20.pt")
 
         return self.p_encoder, self.q_encoder
 
@@ -354,10 +360,13 @@ class DenseRetrieval(SparseRetrieval):
         """ MRC데이터에 대한 성능을 검증합니다. retrieve를 통한 결과 + acc측정"""
         result_dict = {}
         for topK in tqdm(topK_list):
-            result_retriever = self.retrieve(dataset, topk=topK)
+            # retrieve_dpr을 통해서 topk에 해당하는 임베딩을 list에 따라 만들어준다.
+            result_retriever = self.retrieve_dpr(dataset, topk=topK)
             correct = 0
             for index in tqdm(range(len(result_retriever)), desc="topk_experiment"):
-                if  result_retriever['original_context'][index][:200] in result_retriever['context'][index]:
+                # 정답이면 1씩 증가
+                # 200이 아니라 topK개수만큼 retrieve를 하는 것
+                if  result_retriever['original_context'][index][:topK] in result_retriever['context'][index]:
                     correct += 1
             result_dict[datatset_name + "_topk_" + str(topK)] = correct/len(result_retriever)
         return result_dict
@@ -388,7 +397,7 @@ if __name__=="__main__":
                                     context_path = context_path, dataset_path=dataset_path, 
                                     tokenizer=tokenizer, train_data=org_dataset['train'], 
                                     num_neg=12, is_bm25=True, wandb=False)
-    retriever = dense_retriever
+    
     args = TrainingArguments(
         output_dir="dense_retireval",
         evaluation_strategy="epoch",
