@@ -449,3 +449,4 @@ if __name__ == "__main__":
 
         with timer("single query by exhaustive search"):
             scores, indices = retriever.retrieve(query)
+            scores, indices = retriever.retrieve(query)
