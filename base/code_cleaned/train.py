@@ -13,14 +13,13 @@ from transformers import (
     AutoModelForQuestionAnswering,
     AutoTokenizer,
     DataCollatorWithPadding,
-    #EvalPrediction,
+    EvalPrediction,
     HfArgumentParser,
     TrainingArguments,
     set_seed,
 )
-from utils.utils_qa import check_no_error #, postprocess_qa_predictions
-from utils.preprocessing import *
-from utils.postprocessing import *
+
+import utils_qa
 import timeit
 import os
 
@@ -164,7 +163,7 @@ def run_mrc(
     pad_on_right = tokenizer.padding_side == "right"
 
     # 오류가 있는지 확인합니다.
-    last_checkpoint, max_seq_length = check_no_error(
+    last_checkpoint, max_seq_length = utils_qa.check_no_error(
         data_args, training_args, datasets, tokenizer
     )
 
@@ -176,7 +175,7 @@ def run_mrc(
         train_dataset = datasets["train"]
         
         # dataset에서 train feature를 생성합니다.
-        train_dataset = preprocess_dataset_with_answers(
+        train_dataset = utils_qa.preprocess_dataset_with_answers(
             dataset=train_dataset, 
             tokenizer=tokenizer, 
             data_args=data_args, 
@@ -202,7 +201,7 @@ def run_mrc(
         #    )
 
         # Validation Feature 생성 with answers
-        eval_dataset = preprocess_dataset_with_answers(
+        eval_dataset = utils_qa.preprocess_dataset_with_answers(
             dataset=eval_dataset, 
             tokenizer=tokenizer, 
             data_args=data_args, 
@@ -226,7 +225,7 @@ def run_mrc(
         return metric.compute(predictions=p.predictions, references=p.label_ids)
 
     # Trainer 초기화
-    trainer = initiate_trainer(
+    trainer = utils_qa.initiate_trainer(
         model=model,
         training_args=training_args,
         data_args=data_args,
