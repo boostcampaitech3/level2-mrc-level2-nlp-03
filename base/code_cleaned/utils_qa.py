@@ -140,7 +140,7 @@ def preprocess_dataset_with_answers(
         )
 
         # (question|context) 혹은 (context|question) 순서 확인용 
-        print(tokenizer.decode(tokenized_examples['input_ids'][0]))
+        #print(tokenizer.decode(tokenized_examples['input_ids'][0]))
 
         # 길이가 긴 context가 등장할 경우 truncate를 진행해야하므로, 해당 데이터셋을 찾을 수 있도록 mapping 가능한 값이 필요합니다.
         sample_mapping = tokenized_examples.pop("overflow_to_sample_mapping")
@@ -273,7 +273,7 @@ def preprocess_dataset_with_no_answers(
         )
 
         # (question|context) 혹은 (context|question) 순서 확인용 
-        print(tokenizer.decode(tokenized_examples['input_ids'][0]))
+        #print(tokenizer.decode(tokenized_examples['input_ids'][0]))
 
         # 길이가 긴 context가 등장할 경우 truncate를 진행해야하므로, 해당 데이터셋을 찾을 수 있도록 mapping 가능한 값이 필요합니다.
         sample_mapping = tokenized_examples.pop("overflow_to_sample_mapping")
@@ -381,6 +381,7 @@ def postprocess_qa_predictions(
     )
 
     # 전체 example들에 대한 main Loop
+    print("Start postprocessing for qa_predictions...")
     for example_index, example in enumerate(tqdm(examples)):
         # 해당하는 현재 example index
         feature_indices = features_per_example[example_index]
