@@ -30,9 +30,9 @@ from transformers import (
     TrainingArguments,
     set_seed,
 )
-from utils.utils_qa import check_no_error #, postprocess_qa_predictions
-from utils.preprocessing import *
-from utils.postprocessing import *
+
+import utils_qa
+
 import timeit
 import os
 
@@ -223,7 +223,7 @@ def run_mrc(
     pad_on_right = tokenizer.padding_side == "right"
 
     # 오류가 있는지 확인합니다.
-    last_checkpoint, max_seq_length = check_no_error(
+    last_checkpoint, max_seq_length = utils_qa.check_no_error(
         data_args, training_args, datasets, tokenizer
     )
 
@@ -235,7 +235,7 @@ def run_mrc(
 
     # Validation Feature 생성
     if training_args.do_predict:
-        eval_dataset = preprocess_dataset_with_no_answers(
+        eval_dataset = utils_qa.preprocess_dataset_with_no_answers(
             dataset=eval_dataset, 
             tokenizer=tokenizer, 
             data_args=data_args,
@@ -244,7 +244,7 @@ def run_mrc(
             max_seq_length=max_seq_length
             )
     elif training_args.do_eval:
-        eval_dataset = preprocess_dataset_with_answers(
+        eval_dataset = utils_qa.preprocess_dataset_with_answers(
             dataset=eval_dataset, 
             tokenizer=tokenizer, 
             data_args=data_args, 
@@ -272,7 +272,7 @@ def run_mrc(
     # Trainer 초기화
     write_mode = 'ret_eval_only'
 
-    trainer = initiate_trainer(
+    trainer = utils_qa.initiate_trainer(
         model=model,
         training_args=training_args,
         data_args=data_args,
