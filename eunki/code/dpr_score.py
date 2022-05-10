@@ -26,9 +26,9 @@ def get_dpr_score(query, contexts, tokenizer, p_encoder, q_encoder):
 
     # p_encoder.load_state_dict(torch.load(p_encoder_path))
     # q_encoder.load_state_dict(torch.load(q_encoder_path))
-    if torch.cuda.is_available():
-        p_encoder.cuda()
-        q_encoder.cuda()
+    # if torch.cuda.is_available():
+    #     p_encoder.cuda()
+    #     q_encoder.cuda()
 
     with torch.no_grad():
         p_encoder.eval()
