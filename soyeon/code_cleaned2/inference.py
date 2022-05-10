@@ -40,6 +40,7 @@ from retrieval import SparseRetrieval
 from dense_retriver import DenseRetrieval
 
 import timeit
+import time
 import os
 
 #from trainer_qa import  QuestionAnsweringBaseTrainer
@@ -77,7 +78,7 @@ def main():
         # name : 저장되는 실험 이름
         # entity : 우리 그룹/팀 이름
 
-        wandb.init(project='sujeongim',
+        wandb.init(project='wecando',
                    name=exp_full_name,
                    entity='mrc-competition')  # nlp-03
         wandb.config.update(training_args)
@@ -143,6 +144,7 @@ def main():
 
     if data_args.eval_retrieval:
         # doc score들 일단 뽑아만 둘려고 df 따로 받아서 run_mrc에 넣어줌
+
         datasets, df = run_sparse_retrieval(
             tokenizer.tokenize, datasets, training_args, data_args, p_encoder= p_encoder, q_encoder = q_encoder
         )
@@ -175,6 +177,7 @@ def run_sparse_retrieval(
             p_encoder= p_encoder, q_encoder=q_encoder,
             use_wiki_preprocessing=data_args.use_wiki_preprocessing
         )
+
         retriever.get_sparse_embedding()
     else:
         retriever = DenseRetrieval(tokenize_fn=tokenize_fn, data_path = data_path, 
@@ -235,10 +238,15 @@ def run_sparse_retrieval(
                     id=None,
                 ),
                 "context": Value(dtype="string", id=None),
+
                 "id": Value(dtype="string", id=None),
                 "question": Value(dtype="string", id=None),
+
                 "document_id": Value(dtype="int64", id=None),  # 추가 했습니다
                 "title": Value(dtype="string", id=None),  # 추가했습니다
+
+                # "context_list":Sequence(feature={"single_conteext":Value(dtype='string',id=None)}),
+                # "doc_scores": Sequence(feature={"single_score": Value(dtype='float', id=None)})
             }
         )
     datasets = DatasetDict({"validation": Dataset.from_pandas(df, features=f)})
@@ -282,22 +290,24 @@ def run_mrc(
 
     # Validation Feature 생성
     if training_args.do_predict:
-        eval_dataset = utils_qa.preprocess_dataset_with_no_answers(
+        eval_dataset, eval_len_info = utils_qa.preprocess_dataset_with_no_answers(
             dataset=eval_dataset, 
             tokenizer=tokenizer, 
             data_args=data_args,
             column_names=column_names,
             pad_on_right=pad_on_right,
-            max_seq_length=max_seq_length
+            max_seq_length=max_seq_length,
+            data_df=df
             )
     elif training_args.do_eval:
-        eval_dataset = utils_qa.preprocess_dataset_with_answers(
+        eval_dataset, eval_len_info = utils_qa.preprocess_dataset_with_answers(
             dataset=eval_dataset, 
             tokenizer=tokenizer, 
             data_args=data_args, 
             column_names=column_names, 
             pad_on_right=pad_on_right, 
-            max_seq_length=max_seq_length, 
+            max_seq_length=max_seq_length,
+            data_df=df,
             is_train = not training_args.do_eval)
 
     # Data collator
@@ -329,6 +339,8 @@ def run_mrc(
         compute_metrics=compute_metrics,
         callbacks=[customBaseWandbCallback],
         answer_column_name="answers" if "answers" in column_names else column_names[2],
+        eval_len_info = eval_len_info,
+        data_df = df
     )
 
     logger.info("*** Evaluate ***")
