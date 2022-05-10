@@ -361,12 +361,12 @@ class DenseRetrieval(SparseRetrieval):
         result_dict = {}
         for topK in tqdm(topK_list):
             # retrieve_dpr을 통해서 topk에 해당하는 임베딩을 list에 따라 만들어준다.
-            result_retriever = self.retrieve_dpr(dataset, topk=topK)
+            result_retriever = self.retrieve_dpr(dataset = dataset, topk=topK, p_encoder = self.p_encoder, q_encoder = self.q_encoder)
             correct = 0
             for index in tqdm(range(len(result_retriever)), desc="topk_experiment"):
                 # 정답이면 1씩 증가
                 # 200이 아니라 topK개수만큼 retrieve를 하는 것
-                if  result_retriever['original_context'][index][:topK] in result_retriever['context'][index]:
+                if result_retriever['original_context'][index] in result_retriever['context'][index][:topK]:
                     correct += 1
             result_dict[datatset_name + "_topk_" + str(topK)] = correct/len(result_retriever)
         return result_dict
