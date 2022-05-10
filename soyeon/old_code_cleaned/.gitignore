@@ -1,0 +1,5 @@
+__pycache__
+models/
+outputs/
+test_json_results/
+wandb/
