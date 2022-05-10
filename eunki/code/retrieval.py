@@ -216,11 +216,11 @@ class SparseRetrieval:
             faiss.write_index(self.indexer, indexer_path)
             print("Faiss Indexer Saved.")
     
-    def retrieve_dpr(self, dataset, topk: Optional[int] = 20):
+    def retrieve_dpr(self, dataset, topk: Optional[int] = 20, p_encoder = None, q_encoder = None):
         print("dpr mode!")
         tokenizer = AutoTokenizer.from_pretrained("klue/bert-base")
         # 예측을 통해 생성된 score df를 얻는다.
-        dpr_score = get_dpr_score(dataset['question'], self.contexts, tokenizer,self.p_encoder, self.q_encoder)
+        dpr_score = get_dpr_score(dataset['question'], self.contexts, tokenizer, p_encoder, q_encoder)
 
         bm25_score = []
         for query in dataset['question']:
@@ -552,6 +552,7 @@ if __name__ == "__main__":
         tokenize_fn=tokenizer.tokenize,
         data_path=args.data_path,
         context_path=args.context_path,
+        is_bm25 = True
     )
 
     query = "대통령을 포함한 미국의 행정부 견제권을 갖는 국가 기관은?"
