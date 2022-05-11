@@ -13,6 +13,8 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from tqdm.auto import tqdm
 # pip install rank_bm25을 통해서 먼저 설치해주시면 됩니다.
 import rank_bm25
+import torch
+import torch.nn.functional as F
 from dpr_score import get_dpr_score
 
 from pathos.multiprocessing import ProcessingPool as Pool
@@ -233,7 +235,7 @@ class SparseRetrieval:
         total_score = []
         for idx in range(len(dataset['question'])):
             # grid search를 통해 적절한 값을 찾는다.
-            total_score.append((dpr_score[idx]*0.2+bm25_score[idx]).tolist())
+            total_score.append((dpr_score[idx]*0.1+bm25_score[idx]).tolist())
         total_score = torch.tensor(np.array(total_score))
         ranks = torch.argsort(total_score, dim=1, descending=True).squeeze()
         context_list = []

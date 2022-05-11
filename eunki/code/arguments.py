@@ -31,13 +31,13 @@ class ModelArguments:
     ) 
 
     dpr_q_encoder_path : Optional[str] = field(
-        default="./outputs/dpr/best_p_enc_model.pt",
+        default="./outputs/dpr/q_encoder_14.pt",
         metadata={
             "help": "Pretrained tokenizer name or path if not the same as model_name"
         },
     )
     dpr_p_encoder_path : Optional[str] = field(
-        default="./outputs/dpr/best_p_enc_model.pt",
+        default="./outputs/dpr/p_encoder_14.pt",
         metadata={
             "help": "Pretrained tokenizer name or path if not the same as model_name"
         },
@@ -124,6 +124,6 @@ class DataTrainingArguments:
         metadata={"help": "Run dpr+bm25 for default retrival"}
     )
     dpr_negative: bool = field(
-        default=False,
+        default=True,
         metadata={"help": "Run DenseRetrieval.py with negative sample"}
     )

@@ -12,6 +12,8 @@ from pathos.multiprocessing import ProcessingPool as Pool
 import pandas as pd
 import time
 import pickle
+import torch
+import torch.nn.functional as F
 
 import numpy as np
 from arguments import DataTrainingArguments, ModelArguments
@@ -39,7 +41,7 @@ from transformers import (
 from utils_qa import check_no_error, postprocess_qa_predictions
 
 from retrieval import SparseRetrieval
-from dense_retriever import DenseRetrieval
+from dense_retriver import DenseRetrieval
 
 logger = logging.getLogger(__name__)
 
@@ -96,8 +98,7 @@ def main():
     # True일 경우 : run passage retrieval
     if data_args.eval_retrieval:
         datasets = run_sparse_retrieval(
-            tokenizer.tokenize, datasets, training_args, data_args, p_encoder= p_encoder, q_encoder = p_encoder
-        )
+            tokenizer.tokenize, datasets, training_args, data_args, tokenizer)
 
     # eval or predict mrc model
     if training_args.do_eval or training_args.do_predict:
@@ -109,6 +110,7 @@ def run_sparse_retrieval(
     datasets: DatasetDict,
     training_args: TrainingArguments,
     data_args: DataTrainingArguments,
+    tokenizer = None,
     data_path: str = "../data",
     context_path: str = "wikipedia_documents.json",
     p_encoder = None,
@@ -146,7 +148,7 @@ def run_sparse_retrieval(
             print("Calculating BM25 similarity...")
             if data_args.dpr : # dpr + bm25 
                 df = retriever.retrieve_dpr(
-                    datasets["validation"], topk=data_args.top_k_retrieval
+                    datasets["validation"], topk=data_args.top_k_retrieval, p_encoder = retriever.p_encoder, q_encoder = retriever.q_encoder
                 )
             else:
                 df = retriever.retrieve(
