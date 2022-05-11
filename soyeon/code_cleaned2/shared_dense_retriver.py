@@ -217,8 +217,9 @@ class DenseRetrieval(SparseRetrieval):
         self.p_encoder.zero_grad()
         # self.q_encoder.zero_grad()
         torch.cuda.empty_cache()
-
+        print('#####NOW ON DPR TRAINING')
         train_iterator = trange(int(args.num_train_epochs), desc="Epoch")
+        breakpoint()
         for epoch, _ in enumerate(train_iterator):
             epoch_iterator = tqdm(train_dataloader, desc="Iteration")
 
@@ -266,6 +267,11 @@ class DenseRetrieval(SparseRetrieval):
                 self.p_encoder.zero_grad()
                 global_step += 1
                 torch.cuda.empty_cache()
+                # TEST MODE
+                # self.get_dense_embedding()
+                # torch.save(self.p_encoder.state_dict(), f"./outputs/dpr/p_encoder_{epoch}.pt")
+                #
+                # break
 
             # wandb.log
             # if self.wandb==True:
@@ -276,7 +282,7 @@ class DenseRetrieval(SparseRetrieval):
             #     result_train.update(result_valid)
             #     wandb.log(result_train)
             topK_list = [1, 10, 20, 30, 50]
-            self.get_dense_embedding()
+            # self.get_dense_embedding()
             # result_train = self.topk_experiment(topK_list, self.org_dataset['train'], datatset_name="train")
             # result_valid = self.topk_experiment(topK_list, self.org_dataset['validation'], datatset_name="valid")
             # print(result_train)
@@ -422,7 +428,7 @@ if __name__ == "__main__":
         learning_rate=8e-6,
         per_device_train_batch_size=2,
         per_device_eval_batch_size=2,
-        num_train_epochs=15,
+        num_train_epochs=10, # 15
         weight_decay=0.01,
     )
 
