@@ -17,7 +17,7 @@ from dpr_score import get_dpr_score
 
 from pathos.multiprocessing import ProcessingPool as Pool
 from transformers import AutoTokenizer, BertModel, BertPreTrainedModel, AdamW, TrainingArguments, get_linear_schedule_with_warmup
-
+import time
 
 @contextmanager
 def timer(name):
@@ -57,7 +57,7 @@ class MyBm25(rank_bm25.BM25Okapi):
     
     def get_top_n(self, query, documents, n=5):
         assert self.corpus_size == len(documents), "The documents given don't match the index corpus!"
-
+        breakpoint()
         scores = self.get_scores(query)
         # 이미 구현되어 있는 함수를 사용하여 점수를 구한다.
 
@@ -112,9 +112,10 @@ class SparseRetrieval:
         self.ids = list(range(len(self.contexts)))
 
         # Transform by vectorizer
+        self.tokenize_fn = tokenize_fn # BM25
         self.tfidfv = TfidfVectorizer(
-            tokenizer=tokenize_fn, ngram_range=(1, 2), max_features=50000,
-        )
+            tokenizer=self.tokenize_fn, ngram_range=(1, 4), max_features=50000,
+        ) # 원래: ngram_range=(1,2)
 
         self.p_embedding = None  # get_sparse_embedding()로 생성합니다
         self.indexer = None  # build_faiss()로 생성합니다.
@@ -170,6 +171,8 @@ class SparseRetrieval:
                 print("Building bm25... It may take 1 minute and 30 seconds...")
                 # bm25 must tokenizer first 
                 # because it runs pool inside and this cuases unexpected result.
+
+                # 이거 한번에 안해도 되는거 맞나요?
                 tokenized_corpus = []
                 for c in tqdm(self.contexts):
                     tokenized_corpus.append(self.tokenize_fn(c))
@@ -221,6 +224,7 @@ class SparseRetrieval:
         print("dpr mode!")
         tokenizer = AutoTokenizer.from_pretrained("klue/bert-base")
         # 예측을 통해 생성된 score df를 얻는다.
+        # 확인 한번 더 해봐야할 듯
         dpr_score = get_dpr_score(dataset['question'], self.contexts, tokenizer, p_encoder, q_encoder)
 
         bm25_score = []
@@ -291,11 +295,20 @@ class SparseRetrieval:
                 Ground Truth가 있는 Query (train/valid) -> 기존 Ground Truth Passage를 같이 반환합니다.
                 Ground Truth가 없는 Query (test) -> Retrieval한 Passage만 반환합니다.
         """
-
-        assert self.p_embedding is not None, "get_sparse_embedding() 메소드를 먼저 수행해줘야합니다."
+        if not self.is_bm25: # tf-idf 면
+            assert self.p_embedding is not None, "TF-IDF모드입니다. get_sparse_embedding() 메소드를 먼저 수행해줘야합니다."
+        else:
+            assert self.bm25 is not None, "BM25 모드입니다. get_sparse_embedding() 메소드를 먼저 수행해줘야합니다."
 
         if isinstance(query_or_dataset, str):
-            doc_scores, doc_indices = self.get_relevant_doc(query_or_dataset, k=topk)
+            if not self.is_bm25:
+                doc_scores, doc_indices = self.get_relevant_doc(query_or_dataset, k=topk)
+            else:
+                # TODO
+                breakpoint()
+                from dense_retriver import par_search
+                doc_scores, doc_indices = par_search(queries, top_k)
+
             print("[Search query]\n", query_or_dataset, "\n")
 
             for i in range(topk):
@@ -308,10 +321,22 @@ class SparseRetrieval:
 
             # Retrieve한 Passage를 pd.DataFrame으로 반환합니다.
             total = []
-            with timer("query exhaustive search"):
-                doc_scores, doc_indices = self.get_relevant_doc_bulk(
-                    query_or_dataset["question"], k=topk
-                )
+            if not self.is_bm25:
+                with timer("query exhaustive search with tf-idf"):
+                    doc_scores, doc_indices = self.get_relevant_doc_bulk(
+                        query_or_dataset["question"], k=topk
+                    )
+            else:
+                breakpoint()
+                from dense_retriver import par_search
+                with timer("query exhaustive search with bm25"):
+                    # TODO
+                    # https://stackoverflow.com/questions/63517293/valueerror-textencodeinput-must-be-uniontextinputsequence-tupleinputsequence
+                    tok_q = self.tokenize_fn(query_or_dataset["question"])
+                    doc_score, doc_indices = self.bm25.get_top_n(tok_q, self.contexts, n=topk)
+                    # doc_scores, doc_indices = par_search(query_or_dataset["question"], topk,
+                    #                                      retriever=self)
+
             for idx, example in enumerate(
                 tqdm(query_or_dataset, desc="Sparse retrieval: ")
             ):
@@ -334,7 +359,7 @@ class SparseRetrieval:
                 if "context" in example.keys() and "answers" in example.keys():
                     # validation 데이터를 사용하면 ground_truth context와 answer도 반환합니다.
                     tmp["original_context"] = example["context"]
-                    tmp["answers"] = example["answers"]
+                    tmp["answers"] = example["answers"] #original answer이런거 필요할까?
                     tmp['title'] = example['title'] # 추가
                     tmp['document_id'] = example['document_id'] # 추가
                 total.append(tmp)

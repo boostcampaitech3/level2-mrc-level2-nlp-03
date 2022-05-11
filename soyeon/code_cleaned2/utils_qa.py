@@ -105,15 +105,19 @@ def check_no_error(
 ## ------------------------------ preprocessing ------------------------------------##
 # train data
 # Train preprocessing / 전처리를 진행합니다.
+
 def preprocess_dataset_with_answers(
     dataset, 
     tokenizer, 
     data_args, 
     column_names, 
     pad_on_right, 
-    max_seq_length, 
-    is_train : bool):
-    
+    max_seq_length,
+    is_train : bool,
+    data_df=None,
+):
+
+
     question_column_name = "question" if "question" in column_names else column_names[0]
     context_column_name = "context" if "context" in column_names else column_names[1]
     answer_column_name = "answers" if "answers" in column_names else column_names[2]
@@ -127,6 +131,8 @@ def preprocess_dataset_with_answers(
             examples[question_column_name] = ['question ' + x for x in q]
             examples[context_column_name] = ['context' + x for x in c]
 
+
+        print('#####NOW ON TOKENIZING : question & all contexts')
         tokenized_examples = tokenizer(
             examples[question_column_name if pad_on_right else context_column_name],
             examples[context_column_name if pad_on_right else question_column_name],
@@ -138,6 +144,37 @@ def preprocess_dataset_with_answers(
             # return_token_type_ids=False, # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
             padding="max_length" if data_args.pad_to_max_length else False,
         )
+
+        """
+        약간뻘짓
+        # context_lists = df['context_list'].tolist()
+        # context_len = defaultdict(list)
+        # for idx in range(len(context_lists)):
+        #     con_out = tokenizer( context_lists[idx], padding=False)
+        #     ques_out = question_examples['input_ids'][idx]
+        #     together_out = tokenizer(
+        #         [examples[question_column_name if pad_on_right else context_column_name][idx]]+ \
+        #         context_lists[idx],
+        #         truncation=True, #"only_second" if pad_on_right else "only_first",
+        #         max_length=max_seq_length,
+        #         stride=data_args.doc_stride,
+        #         return_overflowing_tokens=True,
+        #         return_offsets_mapping=True,
+        #         # return_token_type_ids=False, # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
+        #         padding="max_length" if data_args.pad_to_max_length else False,
+        #     )
+        #     breakpoint()
+        #     ques_len.append(len(ques_out))
+        #     new_sum = 0
+        #     for o in con_out['input_ids']:
+        #         context_len[idx].append(len(o)-2) # 각 문장 별로 CLS, SEP 붙어서
+        #         new_sum += (len(o)-2)
+        #     assert len(ques_out) + new_sum+1 == len(tokenized_examples['input_ids'][0])
+                # 따라서 유추해야하는 총 문장 길이는 1(CLS)+question_only+1(SEP) + PASSAGES ONLY + 1(SEP)
+                # => ques_tokenized_len + PASSAGES_ONLY + 1(SEP)
+            # return_token_type_ids=False, # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
+        # assert ques_len[0]
+        """
 
         # (question|context) 혹은 (context|question) 순서 확인용 
         #print(tokenizer.decode(tokenized_examples['input_ids'][0]))
@@ -226,6 +263,17 @@ def preprocess_dataset_with_answers(
     #    train_dataset = datasets["train"]
 
     # dataset에서 train feature를 생성합니다.
+    context_len = None
+    if data_df is not None:
+        questions = data_df['question'].tolist()
+        print('#####NOW ON getting length : question & single contexts ')
+        context_len = [[] for _ in range(len(questions))]
+        context_lists = data_df['context_list'].tolist()
+        for idx, cons in enumerate(context_lists):
+            context_len[idx].append(len(questions[idx]))
+            for con in cons:
+                context_len[idx].append(len(con))
+
     dataset = dataset.map(
         prepare_features,
         batched=True,
@@ -234,7 +282,7 @@ def preprocess_dataset_with_answers(
         load_from_cache_file=not data_args.overwrite_cache,
     )
 
-    return dataset
+    return dataset, context_len
 
 
 
@@ -245,7 +293,9 @@ def preprocess_dataset_with_no_answers(
     data_args,
     column_names, 
     pad_on_right, 
-    max_seq_length):
+    max_seq_length,
+    data_df=None,
+    ):
      
     question_column_name = "question" if "question" in column_names else column_names[0]
     context_column_name = "context" if "context" in column_names else column_names[1]
@@ -319,6 +369,8 @@ def postprocess_qa_predictions(
     max_answer_length: int = 30,
     null_score_diff_threshold: float = 0.0,
     output_dir: Optional[str] = None,
+    data_df = None, # 추가
+    eval_len_info=None,  # 추가
     prefix: Optional[str] = None,
     is_world_process_zero: bool = True,
 ):
@@ -382,6 +434,7 @@ def postprocess_qa_predictions(
 
     # 전체 example들에 대한 main Loop
     print("Start postprocessing for qa_predictions...")
+    max_vals = []
     for example_index, example in enumerate(tqdm(examples)):
         # 해당하는 현재 example index
         feature_indices = features_per_example[example_index]
@@ -390,6 +443,7 @@ def postprocess_qa_predictions(
         prelim_predictions = []
 
         # 현재 example에 대한 모든 feature 생성합니다.
+        max_val = -1e9
         for feature_index in feature_indices:
             # 각 featureure에 대한 모든 prediction을 가져옵니다.
             start_logits = all_start_logits[feature_index]
@@ -443,18 +497,55 @@ def postprocess_qa_predictions(
                         and not token_is_max_context.get(str(start_index), False)
                     ):
                         continue
+
+                    # eval_len_info : [question_len, passage1_len, passage2_len, ...]
+
+                    def guess(start_v, end_v, example_len_info, doc_score):
+                        len_infos = example_len_info[1:]
+                        total_v = 0
+
+                        for idx, len_v in enumerate(len_infos):
+                            if total_v <= start_v <= total_v+len_v and total_v <= end_v <= total_v+len_v:
+                                # 같은 passage에 있지 않으면 애초에 걸러야함
+                                return doc_score[idx]
+                            elif total_v <= start_v <= total_v+len_v and total_v+len_v < end_v :
+                                return None
+
+                            elif start_v<total_v and total_v <= end_v <= total_v+len_v:
+                                return None
+
+                            else:
+                                total_v += (len_v+1) # 띄어쓰기해서 붙이니까
+                        # 여기서 멈추면 문제가 있는겁니다!
+                        breakpoint()
+                    if offset_mapping[start_index][0] >= offset_mapping[end_index][1]:
+                        # start_v 가 더 클경우 고려할 필요가 없지
+                        continue
+                    weight_score = guess(offset_mapping[start_index][0], offset_mapping[end_index][1],
+                                         eval_len_info[example_index], data_df['doc_scores'][example_index])
+                    # assert start_logits[start_index] <0 and end_logits[end_index]<0
+                    # if start_logits[start_index] >=0 or end_logits[end_index]>=0:
+                    #     breakpoint()
+                    if weight_score is None:
+                        continue
+                    max_val = max(start_logits[start_index], end_logits[end_index], max_val)
+                    # TODO 근데 exponential을 취하면 -logit 값이 penalty가 쎄져서.. -> but 이게 제일 높음
+                    cur_score = np.exp(start_logits[start_index] + end_logits[end_index])*weight_score*1e6  # 안곱해주면 precision 오차 발생할듯
+                    # cur_score = ((start_logits[start_index] +20) + (end_logits[end_index]+20)) * weight_score
+
                     prelim_predictions.append(
                         {
                             "offsets": (
                                 offset_mapping[start_index][0],
                                 offset_mapping[end_index][1],
-                            ),
-                            "score": start_logits[start_index] + end_logits[end_index],
+                            ), # 다 음수로 나오는데 음수가 더 작은 값에다가 더 작은 score값 곱해주면 더 커짐
+                            # "score": (start_logits[start_index] + end_logits[end_index])*weight_score,
+                            "score": cur_score,
                             "start_logit": start_logits[start_index],
                             "end_logit": end_logits[end_index],
                         }
                     )
-
+        max_vals.append(max_val)
         if version_2_with_negative:
             # minimum null prediction을 추가합니다.
             prelim_predictions.append(min_null_prediction)
@@ -566,11 +657,13 @@ def postprocess_qa_predictions(
                 writer.write(
                     json.dumps(scores_diff_json, indent=4, ensure_ascii=False) + "\n"
                 )
-
+    print('max logits ', max(max_vals))
     return all_predictions
 
 
 # Post-processing 함수 반영한 trainer 함수 정의
+eval_len_infos = None
+data_dfs = None
 def initiate_trainer(
         model,
         training_args,
@@ -582,16 +675,23 @@ def initiate_trainer(
         data_collator,
         compute_metrics,
         callbacks,
-        answer_column_name):
-
+        answer_column_name,
+        eval_len_info=None,
+        data_df=None):
+    global eval_len_infos, data_dfs
+    eval_len_infos  = eval_len_info
+    data_dfs = data_df
     def post_processing_function(examples,features, predictions,training_args) -> EvalPrediction:
         # Post-processing: start logits과 end logits을 original context의 정답과 match시킵니다.
+
         predictions = postprocess_qa_predictions(
             examples=examples,
             features=features,
             predictions=predictions,
             max_answer_length=data_args.max_answer_length,
             output_dir=training_args.output_dir,
+            data_df = data_dfs,
+            eval_len_info = eval_len_infos
         )
         # Metric을 구할 수 있도록 Format을 맞춰줍니다.
         formatted_predictions = [

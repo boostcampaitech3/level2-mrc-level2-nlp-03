@@ -13,23 +13,28 @@ from datasets import Dataset, load_from_disk, concatenate_datasets
 
 from retrieval import SparseRetrieval, timer
 from pathos.multiprocessing import ProcessingPool as Pool
+from tqdm import tqdm
+retriever = None
 
-retriever = None 
-def par_search(queries, topk):
+def par_search(queries, topk, retriever=None):
     # pool.map may put only one argument. We need two arguments: datasets and topk.
     def wrapper(query): 
         tok_q = retriever.tokenize_fn(query)
+        # import os
+        # print("value %s is in PID : %s" % (x, os.getpid()))
         doc_score, doc_indices = retriever.bm25.get_top_n(tok_q, retriever.contexts, n = topk)
         return doc_score, doc_indices
+
     pool = Pool()
-    pool.restart() 
+    pool.restart()
     rel_docs_score_indices = pool.map(wrapper, queries)
     pool.close()
     pool.join()
 
     doc_scores = []
     doc_indices = []
-    for s,idx in rel_docs_score_indices:
+    print('#####NOW ON BM25 COMPUTING SCORE')
+    for s,idx in tqdm(rel_docs_score_indices):
         doc_scores.append( s )
         doc_indices.append( idx )
     return doc_scores, doc_indices
