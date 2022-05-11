@@ -125,7 +125,7 @@ class DenseRetrieval(SparseRetrieval):
         if self.is_bm25 == True:
             global retriever
             retriever = self
-            doc_scores, doc_indices = par_search(queries, top_k)
+            doc_scores, doc_indices = par_search(queries, top_k, retriever)
         else:
             query_vec = self.tfidfv.transform(queries)
             doc_scores, doc_indices = self.get_topk_similarity(query_vec, top_k)
@@ -433,7 +433,7 @@ if __name__ == "__main__":
     )
 
     ## 학습과정 ##
-    #train_dataset = dense_retriever.make_train_data(tokenizer)  # 한번 실행후 생략
+    train_dataset = dense_retriever.make_train_data(tokenizer)  # 한번 실행후 생략
     train_dataset = dense_retriever.load_train_data()
     dense_retriever.init_model(model_checkpoint)
     dense_retriever.train(args, train_dataset)
