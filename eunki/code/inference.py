@@ -12,6 +12,8 @@ from pathos.multiprocessing import ProcessingPool as Pool
 import pandas as pd
 import time
 import pickle
+import torch
+import torch.nn.functional as F
 
 import numpy as np
 from arguments import DataTrainingArguments, ModelArguments
@@ -146,7 +148,7 @@ def run_sparse_retrieval(
             print("Calculating BM25 similarity...")
             if data_args.dpr : # dpr + bm25 
                 df = retriever.retrieve_dpr(
-                    datasets["validation"], topk=data_args.top_k_retrieval
+                    datasets["validation"], topk=data_args.top_k_retrieval, p_encoder = retriever.p_encoder, q_encoder = retriever.q_encoder
                 )
             else:
                 df = retriever.retrieve(
