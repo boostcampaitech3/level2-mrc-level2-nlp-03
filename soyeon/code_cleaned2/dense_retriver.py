@@ -119,7 +119,7 @@ class DenseRetrieval(SparseRetrieval):
         if self.is_bm25==True:
             global retriever
             retriever = self
-            doc_scores, doc_indices = par_search(queries, top_k)
+            doc_scores, doc_indices = par_search(queries, top_k, retriever)
         else:
             query_vec = self.tfidfv.transform(queries)
             doc_scores, doc_indices = self.get_topk_similarity(query_vec, top_k)
