@@ -259,10 +259,10 @@ class DenseRetrieval(SparseRetrieval):
             #     wandb.log(result_train)
             topK_list = [1,10,20,30,50]
             self.get_dense_embedding()
-            result_train = self.topk_experiment(topK_list, self.org_dataset['train'], datatset_name="train")
-            result_valid = self.topk_experiment(topK_list, self.org_dataset['validation'], datatset_name="valid")
-            print(result_train)
-            print(result_valid)
+            # result_train = self.topk_experiment(topK_list, self.org_dataset['train'], datatset_name="train")
+            # result_valid = self.topk_experiment(topK_list, self.org_dataset['validation'], datatset_name="valid")
+            # print(result_train)
+            # print(result_valid)
 
             torch.save(self.p_encoder.state_dict(), f"./outputs/dpr/p_encoder_{epoch}.pt")
             torch.save(self.q_encoder.state_dict(), f"./outputs/dpr/q_encoder_{epoch}.pt")
