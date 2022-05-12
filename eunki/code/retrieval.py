@@ -236,7 +236,7 @@ class SparseRetrieval:
         total_score = []
         for idx in range(len(dataset['question'])):
             # grid search를 통해 적절한 값을 찾는다.
-            total_score.append((dpr_score[idx]*0.1+bm25_score[idx]).tolist())
+            total_score.append((dpr_score[idx]*0.2+bm25_score[idx]).tolist())
         total_score = torch.tensor(np.array(total_score))
         ranks = torch.argsort(total_score, dim=1, descending=True).squeeze()
         context_list = []
@@ -260,10 +260,6 @@ class SparseRetrieval:
                     context_list[idx]
                 ),
             }
-            # if "context" in example.keys() and "answers" in example.keys():
-            #     # validation 데이터를 사용하면 ground_truth context와 answer도 반환합니다.
-            #     tmp["original_context"] = example["context"]
-            #     tmp["answers"] = example["answers"]
             total.append(tmp)
 
         cqas = pd.DataFrame(total)
