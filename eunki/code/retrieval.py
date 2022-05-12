@@ -15,6 +15,7 @@ from tqdm.auto import tqdm
 import rank_bm25
 import torch
 import torch.nn.functional as F
+from torch.nn.functional import softmax
 from dpr_score import get_dpr_score
 
 from pathos.multiprocessing import ProcessingPool as Pool
