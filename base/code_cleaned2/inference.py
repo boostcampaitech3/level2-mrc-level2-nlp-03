@@ -40,7 +40,7 @@ from transformers import (
 import utils_qa
 
 from retrieval import SparseRetrieval
-from dense_retriever import DenseRetrieval
+from dense_retriver import DenseRetrieval
 
 import timeit
 import os
