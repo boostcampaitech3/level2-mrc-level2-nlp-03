@@ -11,6 +11,8 @@ from torch.utils.data import (DataLoader, RandomSampler, TensorDataset)
 from transformers import AutoTokenizer, BertModel, BertPreTrainedModel, AdamW, TrainingArguments, get_linear_schedule_with_warmup
 from datasets import Dataset, load_from_disk, concatenate_datasets
 
+import os
+
 from retrieval import SparseRetrieval, timer
 from pathos.multiprocessing import ProcessingPool as Pool
 
@@ -263,7 +265,7 @@ class DenseRetrieval(SparseRetrieval):
             # result_valid = self.topk_experiment(topK_list, self.org_dataset['validation'], datatset_name="valid")
             # print(result_train)
             # print(result_valid)
-            makedirs("./outputs/dpr", exist_ok=True)
+            os.makedirs("./outputs/dpr", exist_ok=True)
             torch.save(self.p_encoder.state_dict(), f"./outputs/dpr/p_encoder_{epoch}.pt")
             torch.save(self.q_encoder.state_dict(), f"./outputs/dpr/q_encoder_{epoch}.pt")
             
