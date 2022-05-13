@@ -128,7 +128,7 @@ class DenseRetrieval(SparseRetrieval):
                 if len(neg_idx)==self.num_neg: break
             neg_idxs.append(neg_idx)
 
-        with open('../data/neg_idxs.pickle', "wb") as f:
+        with open('/opt/ml/input/data/neg_idxs.pickle', "wb") as f:
             pickle.dump(neg_idxs, f)
 
         print(neg_idxs)
@@ -137,7 +137,7 @@ class DenseRetrieval(SparseRetrieval):
             self.p_with_neg.append(c)
             self.p_with_neg.extend(p_neg)
 
-        with open('../data/p_with_neg.pickle', "wb") as f:
+        with open('/opt/ml/input/data/p_with_neg.pickle', "wb") as f:
             pickle.dump(self.p_with_neg, f)
         
         print(self.p_with_neg)
@@ -159,14 +159,14 @@ class DenseRetrieval(SparseRetrieval):
         train_dataset = TensorDataset(p_seqs['input_ids'], p_seqs['attention_mask'], p_seqs['token_type_ids'], 
                                 q_seqs['input_ids'], q_seqs['attention_mask'], q_seqs['token_type_ids'])                
 
-        with open('../data/dense_train_data.pickle', "wb") as f:
+        with open('/opt/ml/input/data/dense_train_data.pickle', "wb") as f:
             pickle.dump(train_dataset, f)
 
         return train_dataset
 
     def load_train_data(self):
         """미리 생성된 Dense Embedding 모델학습용 데이터를 불러옵니다."""
-        with open("../data/dense_train_data.pickle", "rb") as f:
+        with open("/opt/ml/input/data/dense_train_data.pickle", "rb") as f:
             train_dataset = pickle.load(f)
         return train_dataset
         
@@ -263,7 +263,7 @@ class DenseRetrieval(SparseRetrieval):
             # result_valid = self.topk_experiment(topK_list, self.org_dataset['validation'], datatset_name="valid")
             # print(result_train)
             # print(result_valid)
-
+            makedirs("./outputs/dpr", exist_ok=True)
             torch.save(self.p_encoder.state_dict(), f"./outputs/dpr/p_encoder_{epoch}.pt")
             torch.save(self.q_encoder.state_dict(), f"./outputs/dpr/q_encoder_{epoch}.pt")
             
@@ -303,7 +303,7 @@ class DenseRetrieval(SparseRetrieval):
                     p_embs.append(p_emb)
             self.dense_p_embedding = torch.Tensor(p_embs).reshape(-1,768)
 
-        with open("../data/dense_embedding.bin", "wb") as f:
+        with open("/opt/ml/input/data/dense_embedding.bin", "wb") as f:
             pickle.dump(self.dense_p_embedding, f)
 
         torch.cuda.empty_cache()
@@ -381,8 +381,8 @@ if __name__=="__main__":
     
 
     
-    data_path  = "../data/"
-    dataset_path = "../data/train_dataset"
+    data_path  = "/opt/ml/input/data"
+    dataset_path = "/opt/ml/input/data/train_dataset"
     context_path = "wikipedia_documents.json"
     model_checkpoint = "klue/bert-base"
 
