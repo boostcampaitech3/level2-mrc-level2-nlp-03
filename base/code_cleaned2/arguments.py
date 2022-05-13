@@ -35,7 +35,7 @@ class ModelArguments:
     Arguments pertaining to which model/config/tokenizer we are going to fine-tune from.
     """
     model_name_or_path: str = field(
-        default="klue/bert-base",
+        default="klue/roberta-large",
         metadata={
             "help": "Path to pretrained model or model identifier from huggingface.co/models"
         },
@@ -58,13 +58,13 @@ class ModelArguments:
     ) 
 
     dpr_q_encoder_path : Optional[str] = field(
-        default="./outputs/dpr/best_p_enc_model.pt",
+        default="./outputs/dpr/q_encoder_14.pt",
         metadata={
             "help": "Pretrained tokenizer name or path if not the same as model_name"
         },
     )
     dpr_p_encoder_path : Optional[str] = field(
-        default="./outputs/dpr/best_p_enc_model.pt",
+        default="./outputs/dpr/p_encoder_14.pt",
         metadata={
             "help": "Pretrained tokenizer name or path if not the same as model_name"
         },
