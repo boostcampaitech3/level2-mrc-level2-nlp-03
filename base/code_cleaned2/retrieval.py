@@ -13,9 +13,6 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from tqdm.auto import tqdm
 # pip install rank_bm25을 통해서 먼저 설치해주시면 됩니다.
 import rank_bm25
-import torch
-import torch.nn.functional as F
-from torch.nn.functional import softmax
 from dpr_score import get_dpr_score
 
 from pathos.multiprocessing import ProcessingPool as Pool
@@ -520,7 +517,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="")
     parser.add_argument(
-        "--dataset_name", metavar="/opt/ml/input/data/train_dataset", type=str, help=""
+        "--dataset_name", metavar="./data/train_dataset", type=str, help=""
     )
     parser.add_argument(
         "--model_name_or_path",
@@ -528,7 +525,7 @@ if __name__ == "__main__":
         type=str,
         help="",
     )
-    parser.add_argument("--data_path", metavar="/opt/ml/input/data", type=str, help="")
+    parser.add_argument("--data_path", metavar="./data", type=str, help="")
     parser.add_argument(
         "--context_path", metavar="wikipedia_documents", type=str, help=""
     )
