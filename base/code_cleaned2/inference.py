@@ -10,6 +10,9 @@ from typing import Callable, Dict, List, NoReturn, Tuple
 from pathos.multiprocessing import ProcessingPool as Pool
 import pandas as pd
 
+import torch
+import torch.nn.functional as F
+
 import numpy as np
 from arguments import DataTrainingArguments, ModelArguments, SettingArguments
 from datasets import (
@@ -136,7 +139,7 @@ def main():
     if data_args.eval_retrieval:
         # doc score들 일단 뽑아만 둘려고 df 따로 받아서 run_mrc에 넣어줌
         datasets, df = run_sparse_retrieval(
-            tokenizer.tokenize, datasets, training_args, data_args, p_encoder= p_encoder, q_encoder = p_encoder
+            tokenizer.tokenize, datasets, training_args, data_args,tokenizer
         )
 
     # eval or predict mrc model
@@ -151,6 +154,7 @@ def run_sparse_retrieval(
         datasets: DatasetDict,
         training_args: TrainingArguments,
         data_args: DataTrainingArguments,
+        tokenizer = None,
         data_path: str = "../data",
         context_path: str = "wikipedia_documents.json",
         p_encoder = None,
@@ -187,7 +191,7 @@ def run_sparse_retrieval(
             print("Calculating BM25 similarity...")
             if data_args.dpr : # dpr + bm25 
                 df = retriever.retrieve_dpr(
-                    datasets["validation"], topk=data_args.top_k_retrieval
+                    datasets["validation"], topk=data_args.top_k_retrieval, p_encoder = retriever.p_encoder, q_encoder = retriever.q_encoder
                 )
             else:
                 df = retriever.retrieve(
