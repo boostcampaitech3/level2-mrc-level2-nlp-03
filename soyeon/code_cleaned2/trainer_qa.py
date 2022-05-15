@@ -118,37 +118,6 @@ class QuestionAnsweringTrainer(Trainer):
 # Huggingface의 Trainer를 상속받아 QuestionAnswering을 위한 Trainer를 생성합니다.
 # baseline huggingface overriding
 
-class QuestionAnsweringBaseTrainer2(QuestionAnsweringBaseTrainer):
-    def __init__(self, *args, eval_examples=None, post_process_function=None, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.label_smoother = nn.MSELoss()
-
-    def compute_loss(self, model, inputs, return_outputs=False):
-        """
-        How the loss is computed by Trainer. By default, all models return the loss in the first element.
-        Subclass and override for custom behavior.
-        """
-        if self.label_smoother is not None and "labels" in inputs:
-            labels = inputs.pop("labels")
-        else:
-            labels = None
-        outputs = model(**inputs)
-
-        # outpusts['start_logits'], outpusts['end_logits']
-
-        # Save past state if it exists
-        # TODO: this needs to be fixed and made cleaner later.
-        if self.args.past_index >= 0:
-            self._past = outputs[self.args.past_index]
-
-        if labels is not None:
-            loss = self.label_smoother(outputs, labels)
-        else:
-            # We don't use .loss here since the model may return tuples instead of ModelOutput.
-            loss = outputs["loss"] if isinstance(outputs, dict) else outputs[0]
-
-        return (loss, outputs) if return_outputs else loss
-
 
 class QuestionAnsweringBaseTrainer(QuestionAnsweringTrainer):
     def __init__(self, *args, eval_examples=None, post_process_function=None, **kwargs):
@@ -163,6 +132,23 @@ class QuestionAnsweringBaseTrainer(QuestionAnsweringTrainer):
         # self.callback_handler.callbacks.pop(2) # 아래와 같은 상황에서 WandbCallback 제거
         # [<transformers.trainer_callback.DefaultFlowCallback object at 0x7f333f3a3370>, <transformers.integrations.TensorBoardCallback object at 0x7f333f3a33d0>, <transformers.integrations.WandbCallback object at 0x7f333f3a35b0>, <custom.base_callback.customBaseWandbCallback object at 0x7f333f3a3490>, <transformers.trainer_callback.ProgressCallback object at 0x7f333f3a3430>]
         self.do_log_topk = False
+
+    # def create_scheduler(self, num_training_steps: int, optimizer: torch.optim.Optimizer = None):
+    #     """
+    #     Setup the scheduler. The optimizer of the trainer must have been set up either before this method is called or
+    #     passed as an argument.
+    #     Args:
+    #         num_training_steps (int): The number of training steps to do.
+    #     """
+    #     from transformers.optimization import get_scheduler
+    #     if self.lr_scheduler is None:
+    #         self.lr_scheduler = get_scheduler(
+    #             self.args.lr_scheduler_type,
+    #             optimizer=self.optimizer if optimizer is None else optimizer,
+    #             num_warmup_steps=self.args.get_warmup_steps(num_training_steps),
+    #             num_training_steps=num_training_steps,
+    #         )
+    #     return self.lr_scheduler
 
     def _maybe_log_save_evaluate(self, tr_loss, model, trial, epoch, ignore_keys_for_eval=None):
         if self.control.should_log:
@@ -404,3 +390,34 @@ class QuestionAnsweringBaseTrainer(QuestionAnsweringTrainer):
     #         logits = logits[0]
     #
     #     return (loss, logits, labels)
+
+class QuestionAnsweringBaseTrainer2(QuestionAnsweringBaseTrainer):
+    def __init__(self, *args, eval_examples=None, post_process_function=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.label_smoother = nn.MSELoss()
+
+    def compute_loss(self, model, inputs, return_outputs=False):
+        """
+        How the loss is computed by Trainer. By default, all models return the loss in the first element.
+        Subclass and override for custom behavior.
+        """
+        if self.label_smoother is not None and "labels" in inputs:
+            labels = inputs.pop("labels")
+        else:
+            labels = None
+        outputs = model(**inputs)
+
+        # outpusts['start_logits'], outpusts['end_logits']
+
+        # Save past state if it exists
+        # TODO: this needs to be fixed and made cleaner later.
+        if self.args.past_index >= 0:
+            self._past = outputs[self.args.past_index]
+
+        if labels is not None:
+            loss = self.label_smoother(outputs, labels)
+        else:
+            # We don't use .loss here since the model may return tuples instead of ModelOutput.
+            loss = outputs["loss"] if isinstance(outputs, dict) else outputs[0]
+
+        return (loss, outputs) if return_outputs else loss

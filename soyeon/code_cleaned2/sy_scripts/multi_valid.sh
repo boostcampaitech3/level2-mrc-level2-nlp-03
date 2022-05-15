@@ -16,7 +16,7 @@
 #python inference.py \
 #--output_dir ./outputs/valid_dataset/ \
 #--dataset_name train_dataset/ \
-#--model_name_or_path /opt/ml/level2-mrc-level2-nlp-03/soyeon/old_baseline/model_dir/checkpoint-2500 \
+#--model_name_or_path /opt/ml/level2-mrc-level2-nlp-03/soyeon/old_baseline/model_dir/checkpoint-2500 \ # 2500일때 single로  EM이 얼마였는지 까먹
 #--use_wandb True \
 #--exp_name inference_validate \
 #--do_predict False \
@@ -31,7 +31,7 @@
 python inference.py \
 --output_dir ./outputs/valid_dataset/ \
 --dataset_name train_dataset/ \
---model_name_or_path /opt/ml/level2-mrc-level2-nlp-03/soyeon/old_baseline/model_dir/checkpoint-2500 \
+--model_name_or_path /opt/ml/level2-mrc-level2-nlp-03/soyeon/code_cleaned2/models/train_dataset/checkpoint-1000 \
 --use_wandb True \
 --exp_name inference_validate \
 --do_predict False \
@@ -46,7 +46,7 @@ python inference.py \
 python inference.py \
 --output_dir ./outputs/valid_dataset/ \
 --dataset_name train_dataset/ \
---model_name_or_path /opt/ml/level2-mrc-level2-nlp-03/soyeon/old_baseline/model_dir/checkpoint-2500 \
+--model_name_or_path /opt/ml/level2-mrc-level2-nlp-03/soyeon/code_cleaned2/models/train_dataset/checkpoint-1000 \
 --use_wandb True \
 --exp_name inference_validate \
 --do_predict False \
@@ -61,7 +61,7 @@ python inference.py \
 python inference.py \
 --output_dir ./outputs/valid_dataset/ \
 --dataset_name train_dataset/ \
---model_name_or_path /opt/ml/level2-mrc-level2-nlp-03/soyeon/old_baseline/model_dir/checkpoint-2500 \
+--model_name_or_path /opt/ml/level2-mrc-level2-nlp-03/soyeon/code_cleaned2/models/train_dataset/checkpoint-1000 \
 --use_wandb True \
 --exp_name inference_validate \
 --do_predict False \

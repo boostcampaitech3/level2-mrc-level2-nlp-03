@@ -35,15 +35,18 @@ def main():
         (SettingArguments, ModelArguments, DataTrainingArguments, TrainingArguments)
     )
     setting_args, model_args, data_args, training_args = parser.parse_args_into_dataclasses()
-    training_args.eval_steps= 10
+    training_args.eval_steps= 50#200
     training_args.evaluation_strategy = 'steps'
-    training_args.logging_steps = 10
-    training_args.save_steps = 10
+    training_args.logging_steps = 50#200
+    training_args.save_steps = 500#800
     training_args.report_to = ['wandb']
 
     print(setting_args)
     print(model_args.model_name_or_path)
-
+    # training_args.num_train_epoch = 5
+    # training_args.lr_scheduler = 5
+    training_args.warmup_steps = 180
+    training_args.lr_scheduler_type = 'linear'#"cosine_with_restarts" # ['linear', 'cosine', 'cosine_with_restarts', 'polynomial', 'constant', 'constant_with_warmup']
     # [참고] argument를 manual하게 수정하고 싶은 경우에 아래와 같은 방식을 사용할 수 있습니다
     # training_args.per_device_train_batch_size = 4
     # print(training_args.per_device_train_batch_size)
@@ -64,7 +67,7 @@ def main():
         # name : 저장되는 실험 이름
         # entity : 우리 그룹/팀 이름
 
-        wandb.init(project='wecando',
+        wandb.init(project='kimcando',
                     name=exp_full_name,
                     entity='mrc-competition')  # nlp-03
         wandb.config.update(training_args)
@@ -175,7 +178,7 @@ def run_mrc(
         train_dataset = datasets["train"]
         
         # dataset에서 train feature를 생성합니다.
-        train_dataset = utils_qa.preprocess_dataset_with_answers(
+        train_dataset, train_len_info = utils_qa.preprocess_dataset_with_answers(
             dataset=train_dataset, 
             tokenizer=tokenizer, 
             data_args=data_args, 
@@ -201,7 +204,7 @@ def run_mrc(
         #    )
 
         # Validation Feature 생성 with answers
-        eval_dataset = utils_qa.preprocess_dataset_with_answers(
+        eval_dataset,eval_len_info = utils_qa.preprocess_dataset_with_answers(
             dataset=eval_dataset, 
             tokenizer=tokenizer, 
             data_args=data_args, 
@@ -247,6 +250,7 @@ def run_mrc(
             checkpoint = model_args.model_name_or_path
         else:
             checkpoint = None
+
         train_result = trainer.train(resume_from_checkpoint=checkpoint)
         trainer.save_model()  # Saves the tokenizer too for easy upload
 

@@ -57,7 +57,7 @@ class MyBm25(rank_bm25.BM25Okapi):
     
     def get_top_n(self, query, documents, n=5):
         assert self.corpus_size == len(documents), "The documents given don't match the index corpus!"
-        breakpoint()
+        
         scores = self.get_scores(query)
         # 이미 구현되어 있는 함수를 사용하여 점수를 구한다.
 
@@ -360,6 +360,7 @@ class SparseRetrieval:
                     # validation 데이터를 사용하면 ground_truth context와 answer도 반환합니다.
                     tmp["original_context"] = example["context"]
                     tmp["answers"] = example["answers"] #original answer이런거 필요할까?
+
                     tmp['title'] = example['title'] # 추가
                     tmp['document_id'] = example['document_id'] # 추가
                 total.append(tmp)
