@@ -141,7 +141,7 @@ def preprocess_dataset_with_answers(
             stride=data_args.doc_stride,
             return_overflowing_tokens=True,
             return_offsets_mapping=True,
-            # return_token_type_ids=False, # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
+            return_token_type_ids=False, # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
             padding="max_length" if data_args.pad_to_max_length else False,
         )
 
@@ -318,7 +318,7 @@ def preprocess_dataset_with_no_answers(
             stride=data_args.doc_stride,
             return_overflowing_tokens=True,
             return_offsets_mapping=True,
-            # return_token_type_ids=False, # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
+            return_token_type_ids=False, # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
             padding="max_length" if data_args.pad_to_max_length else False,
         )
 
@@ -347,14 +347,25 @@ def preprocess_dataset_with_no_answers(
                 for k, o in enumerate(tokenized_examples["offset_mapping"][i])
             ]
         return tokenized_examples
-    
+
+    context_len = None
+    if data_df is not None:
+        questions = data_df['question'].tolist()
+        print('#####NOW ON getting length : question & single contexts ')
+        context_len = [[] for _ in range(len(questions))]
+        context_lists = data_df['context_list'].tolist()
+        for idx, cons in enumerate(context_lists):
+            context_len[idx].append(len(questions[idx]))
+            for con in cons:
+                context_len[idx].append(len(con))
+
     dataset = dataset.map(
             prepare_features_no_answers,
             batched=True,
             num_proc=data_args.preprocessing_num_workers,
             remove_columns=column_names,
             load_from_cache_file=not data_args.overwrite_cache,)
-    return dataset
+    return dataset, context_len
 ## -------------------------------- preprocessing ---------------------------------------##
 
 
@@ -519,20 +530,26 @@ def postprocess_qa_predictions(
                         # 여기서 멈추면 문제가 있는겁니다!
                         breakpoint()
                     if offset_mapping[start_index][0] >= offset_mapping[end_index][1]:
-                        # start_v 가 더 클경우 고려할 필요가 없지
+                        #start_v 가 더 클경우 고려할 필요가 없지
                         continue
-                    weight_score = guess(offset_mapping[start_index][0], offset_mapping[end_index][1],
-                                         eval_len_info[example_index], data_df['doc_scores'][example_index])
+
+                    # weight_score = guess(offset_mapping[start_index][0], offset_mapping[end_index][1],
+                    #                      eval_len_info[example_index], data_df['doc_scores'][example_index])
+                    # if weight_score is None:
+                    #     continue
+                    # TODO 근데 exponential을 취하면 -logit 값이 penalty가 쎄져서.. -> but 이게 제일 높음
+                    # cur_score = np.exp(start_logits[start_index] + end_logits[end_index])*weight_score*1e6  # 안곱해주면 precision 오차 발생할듯
+
                     # assert start_logits[start_index] <0 and end_logits[end_index]<0
                     # if start_logits[start_index] >=0 or end_logits[end_index]>=0:
                     #     breakpoint()
-                    if weight_score is None:
-                        continue
-                    max_val = max(start_logits[start_index], end_logits[end_index], max_val)
-                    # TODO 근데 exponential을 취하면 -logit 값이 penalty가 쎄져서.. -> but 이게 제일 높음
-                    cur_score = np.exp(start_logits[start_index] + end_logits[end_index])*weight_score*1e6  # 안곱해주면 precision 오차 발생할듯
-                    # cur_score = ((start_logits[start_index] +20) + (end_logits[end_index]+20)) * weight_score
 
+                    max_val = max(start_logits[start_index], end_logits[end_index], max_val)
+
+
+                    # cur_score = ((start_logits[start_index] +20) + (end_logits[end_index]+20)) * weight_score
+                    # 기본 모드로
+                    cur_score = (start_logits[start_index] + end_logits[end_index])
                     prelim_predictions.append(
                         {
                             "offsets": (

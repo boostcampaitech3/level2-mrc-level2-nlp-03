@@ -69,7 +69,19 @@ class ModelArguments:
             "help": "Pretrained tokenizer name or path if not the same as model_name"
         },
     )
+    loss_alpha : Optional[float] = field(
+        default=0.5,
+        metadata={
+            "help": "loss weighting for start and end"
+        },
+    )
 
+    head_drop_ratio: Optional[float] = field(
+        default=0.7,
+        metadata={
+            "help": "loss weighting for start and end"
+        },
+    )
 
 
 @dataclass

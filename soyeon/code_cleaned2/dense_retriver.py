@@ -414,7 +414,8 @@ if __name__=="__main__":
     )
 
     ## 학습과정 ##
-    train_dataset = dense_retriever.make_train_data(tokenizer) # 한번 실행후 생략
+    # train_dataset = dense_retriever.make_train_data(tokenizer) # 한번 실행후 생략
+    # 이전에 만든거는 tokenize_fn 제대로 들어갔는지 모르겠네
     train_dataset = dense_retriever.load_train_data()
     dense_retriever.init_model(model_checkpoint)
     dense_retriever.train(args, train_dataset)

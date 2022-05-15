@@ -219,7 +219,7 @@ class DenseRetrieval(SparseRetrieval):
         torch.cuda.empty_cache()
         print('#####NOW ON DPR TRAINING')
         train_iterator = trange(int(args.num_train_epochs), desc="Epoch")
-        breakpoint()
+
         for epoch, _ in enumerate(train_iterator):
             epoch_iterator = tqdm(train_dataloader, desc="Iteration")
 
@@ -433,7 +433,7 @@ if __name__ == "__main__":
     )
 
     ## 학습과정 ##
-    train_dataset = dense_retriever.make_train_data(tokenizer)  # 한번 실행후 생략
+    # train_dataset = dense_retriever.make_train_data(tokenizer)  # 한번 실행후 생략
     train_dataset = dense_retriever.load_train_data()
     dense_retriever.init_model(model_checkpoint)
     dense_retriever.train(args, train_dataset)

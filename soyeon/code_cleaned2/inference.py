@@ -120,6 +120,7 @@ def main():
         else model_args.model_name_or_path,
         use_fast=True,
     )
+    breakpoint()
     model = AutoModelForQuestionAnswering.from_pretrained(
         model_args.model_name_or_path,
         from_tf=bool(".ckpt" in model_args.model_name_or_path),
@@ -144,10 +145,8 @@ def main():
 
     if data_args.eval_retrieval:
         # doc score들 일단 뽑아만 둘려고 df 따로 받아서 run_mrc에 넣어줌
-
-        datasets, df = run_sparse_retrieval(
-            tokenizer.tokenize, datasets, training_args, data_args, p_encoder= p_encoder, q_encoder = q_encoder
-        )
+        breakpoint()
+        datasets, df = run_sparse_retrieval( tokenizer, datasets, training_args, data_args, p_encoder= p_encoder, q_encoder = q_encoder )
 
     # eval or predict mrc model
     if training_args.do_eval or training_args.do_predict:
@@ -157,7 +156,7 @@ def main():
 
 
 def run_sparse_retrieval(
-        tokenize_fn: Callable[[str], List[str]],
+        tokenize_fn,
         datasets: DatasetDict,
         training_args: TrainingArguments,
         data_args: DataTrainingArguments,
@@ -165,7 +164,7 @@ def run_sparse_retrieval(
         context_path: str = "wikipedia_documents.json",
         p_encoder = None,
         q_encoder = None
-) -> DatasetDict:
+) :
     
     # Query에 맞는 Passage들을 Retrieval 합니다.
 
