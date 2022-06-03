@@ -1,11 +1,11 @@
-![Untitled](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/593ab849-27e4-432e-bac4-7c69064e8d98/Untitled.png)
+<img width="708" alt="image" src="https://user-images.githubusercontent.com/81913386/171881990-f4daf3ae-0a11-49d3-a5e2-a44c938af82f.png">
 
 ## 프로젝트 개요
 
 > Open Domain Question Answering: Question answering은 **다양한 종류의 질문에 대해 대답하는 인공지능**을 만드는 연구 분야입니다. 다양한 QA 시스템 중, **Open-Domain Question Answering (ODQA) 은 주어지는 지문이 따로 존재하지 않고 사전에 구축되어있는 Knowledge resource 에서 질문에 대답할 수 있는 문서를 찾는** 과정이 추가되기 때문에 더 어려운 문제입니다.
 > 
 
-![Untitled](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/34509f50-ecec-42e9-8548-8b3f0fb201da/Untitled.png)
+<img width="699" alt="image" src="https://user-images.githubusercontent.com/81913386/171882030-3ebd36b8-efd4-4102-bd7a-386a88e27f99.png">
 
 ---
 
@@ -56,7 +56,7 @@
 
 - 주어진 데이터의 분포를 시각화 및 파악하고 중복 및 오태깅된 데이터 파악 및 전처리
 
-![Untitled](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/df40179a-2e3d-46e7-9b2d-bff38de6ee1d/Untitled.png)
+<img width="612" alt="image" src="https://user-images.githubusercontent.com/81913386/171882096-7f9a297f-999d-4b80-a991-135410e71a50.png">
 
 - `id`: 질문의 고유 id
 - `question`: 질문
@@ -70,7 +70,7 @@
 - `title`: 문서의 제목
 - `document_id`: 문서의 고유 id
 
-![length of answer](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/d58f7f8d-3ef3-4a17-baa2-567d742fb888/Untitled.png)
+![length of answer](<img width="323" alt="image" src="https://user-images.githubusercontent.com/81913386/171882146-fb8d4e9f-bc00-445f-9dce-d9093382d8ae.png">)
 
 length of answer
 
@@ -186,11 +186,11 @@ answer 중 가장 두드러지는 특징은 괄호(<> 또는 《》) 와 따옴�
 
 - Public
 
-![Untitled](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/a7ca3920-2370-419d-be73-9324034747d0/Untitled.png)
+<img width="698" alt="image" src="https://user-images.githubusercontent.com/81913386/171882225-b5eb95ac-acc6-4395-ba85-7e19514eea57.png">
 
 - Private
 
-![Untitled](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/3f1e4947-6e73-43f1-85bc-617a3c0d307b/Untitled.png)
+<img width="708" alt="image" src="https://user-images.githubusercontent.com/81913386/171882262-43211e4d-6176-423a-ab9c-f1b02af18f43.png">
 
 성능을 목표로 하지는 않았으나 기능들을 추가하고 실험을 진행해나가며 성능이 결과적으로 단계적으로 상승했다는 점이 의미가 있었다고 생각한다.
 
